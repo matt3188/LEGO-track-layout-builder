@@ -70,21 +70,60 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <canvas ref="canvas" id="trackCanvas"></canvas>
+    <canvas ref="canvas" id="trackCanvas" class="border border-gray-300 block"></canvas>
     
     <!-- Controls Panel -->
-    <div class="controls">
-      <button @click="handleAddStraight">➕ Add Straight</button>
-      <button @click="handleAddCurve">➕ Add Curve</button>
-      <button @click="handleEnableDeleteMode" :class="{ active: isDeleteMode }">🗑️ Delete Mode</button>
-      <button @click="undoLastAction">↩️ Undo</button>
-      <button @click="copyLayout">📋 Copy schema</button>
-      <button @click="clearPieces">❌ Clear</button>
-      <span>{{ copyStatus }}</span>
+    <div class="fixed top-4 left-4 flex flex-col gap-2">
+      <button 
+        @click="handleAddStraight"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        ➕ Add Straight
+      </button>
+      <button 
+        @click="handleAddCurve"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        ➕ Add Curve
+      </button>
+      <button 
+        @click="handleEnableDeleteMode" 
+        :class="[
+          'px-4 py-2 border rounded cursor-pointer transition-colors duration-200',
+          isDeleteMode 
+            ? 'bg-red-500 text-white border-red-600' 
+            : 'border-gray-300 bg-white hover:bg-gray-100'
+        ]"
+      >
+        🗑️ Delete Mode
+      </button>
+      <button 
+        @click="undoLastAction"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        ↩️ Undo
+      </button>
+      <button 
+        @click="copyLayout"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        📋 Copy schema
+      </button>
+      <button 
+        @click="clearPieces"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        ❌ Clear
+      </button>
+      <span class="text-sm text-gray-600">{{ copyStatus }}</span>
     </div>
 
     <!-- Help Button -->
-    <button class="help-button" @click="showHelp = true" title="Show keyboard shortcuts">
+    <button 
+      @click="showHelp = true" 
+      title="Show keyboard shortcuts"
+      class="fixed bottom-4 right-4 w-10 h-10 rounded-full border-2 border-gray-800 bg-white text-xl font-bold cursor-pointer flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-gray-800 hover:text-white hover:scale-110"
+    >
       ?
     </button>
 
@@ -92,63 +131,3 @@ onUnmounted(() => {
     <HelpModal :show="showHelp" @close="closeHelp" />
   </div>
 </template>
-
-<style scoped>
-canvas {
-  border: 1px solid #ccc;
-  display: block;
-}
-
-.controls {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.controls button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.controls button:hover {
-  background: #f0f0f0;
-}
-
-.controls button.active {
-  background: #ff6b6b;
-  color: white;
-  border-color: #ff5252;
-}
-
-.help-button {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid #333;
-  background: white;
-  font-size: 1.2rem;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s;
-}
-
-.help-button:hover {
-  background: #333;
-  color: white;
-  transform: scale(1.1);
-}
-</style>
