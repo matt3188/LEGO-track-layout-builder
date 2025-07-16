@@ -210,12 +210,42 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function addStraight(): void {
     selectedPieceType.value = 'straight';
-    ghostPiece.value = { x: 0, y: 0, type: 'straight', rotation: 0 };
+    
+    // Calculate current mouse position on grid
+    const gridSize = getGridSize();
+    const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
+    const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
+    const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    
+    ghostPiece.value = { 
+      x: snappedX, 
+      y: snappedY, 
+      type: 'straight', 
+      rotation: 0 
+    };
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+    redraw();
   }
 
   function addCurve(): void {
     selectedPieceType.value = 'curve';
-    ghostPiece.value = { x: 0, y: 0, type: 'curve', rotation: 0 };
+    
+    // Calculate current mouse position on grid
+    const gridSize = getGridSize();
+    const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
+    const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
+    const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    
+    ghostPiece.value = { 
+      x: snappedX, 
+      y: snappedY, 
+      type: 'curve', 
+      rotation: 0 
+    };
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+    redraw();
   }
 
   function clearSelection(): void {
@@ -229,6 +259,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     isDeleteMode.value = true;
     selectedPieceType.value = null;
     ghostPiece.value = null;
+    hoveredPiece.value = null;
+    redraw();
   }
 
   function deletePiece(piece: TrackPiece): void {
