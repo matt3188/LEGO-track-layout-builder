@@ -12,75 +12,18 @@
       </div>
       
       <div class="p-6">
-        <div class="mb-8">
-          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">Track Pieces</h3>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">S</kbd>
-            <span class="flex-1 text-gray-600">Add straight track piece</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">C</kbd>
-            <span class="flex-1 text-gray-600">Add curved track piece</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">D</kbd>
-            <span class="flex-1 text-gray-600">Enter delete mode</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Escape</kbd>
-            <span class="flex-1 text-gray-600">Clear selection / Exit mode</span>
-          </div>
-        </div>
-
-        <div class="mb-8">
-          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">Rotation</h3>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">R</kbd>
-            <span class="flex-1 text-gray-600">Rotate piece clockwise</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Shift</kbd> + <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">R</kbd>
-            <span class="flex-1 text-gray-600">Rotate piece counter-clockwise</span>
-          </div>
-        </div>
-
-        <div class="mb-8">
-          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">View Controls</h3>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Cmd/Ctrl</kbd> + <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">0</kbd>
-            <span class="flex-1 text-gray-600">Reset zoom and center view</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Mouse Wheel</kbd>
-            <span class="flex-1 text-gray-600">Zoom in/out</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Click + Drag</kbd>
-            <span class="flex-1 text-gray-600">Pan the view</span>
-          </div>
-        </div>
-
-        <div class="mb-8">
-          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">Actions</h3>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Cmd/Ctrl</kbd> + <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Z</kbd>
-            <span class="flex-1 text-gray-600">Undo last action</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Click</kbd>
-            <span class="flex-1 text-gray-600">Place piece / Delete piece (in delete mode)</span>
-          </div>
-          <div class="flex items-center gap-4 py-2 border-b border-gray-50 last:border-b-0">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">Click + Drag</kbd>
-            <span class="flex-1 text-gray-600">Move existing piece</span>
-          </div>
-        </div>
-
-        <div class="mb-0">
-          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">Help</h3>
-          <div class="flex items-center gap-4 py-2">
-            <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">?</kbd>
-            <span class="flex-1 text-gray-600">Show/hide this help dialog</span>
+        <div v-for="(section, index) in shortcuts" :key="section.title" :class="{ 'mb-8': index < shortcuts.length - 1, 'mb-0': index === shortcuts.length - 1 }">
+          <h3 class="text-lg text-gray-700 mb-4 pb-2 border-b border-gray-200 m-0">{{ section.title }}</h3>
+          <div v-for="(shortcut, shortcutIndex) in section.items" :key="shortcutIndex" :class="{ 'border-b border-gray-50': shortcutIndex < section.items.length - 1 }" class="flex items-center gap-4 py-2">
+            <div class="flex items-center gap-1">
+              <template v-for="(key, keyIndex) in shortcut.keys" :key="keyIndex">
+                <span v-if="keyIndex > 0" class="mx-1">+</span>
+                <kbd class="bg-gray-100 border border-gray-300 rounded px-2 py-1 font-mono text-sm min-w-8 text-center shadow-sm">
+                  {{ key }}
+                </kbd>
+              </template>
+            </div>
+            <span class="flex-1 text-gray-600">{{ shortcut.description }}</span>
           </div>
         </div>
       </div>
@@ -97,4 +40,45 @@ defineProps({
 });
 
 defineEmits(['close']);
+
+const shortcuts = [
+  {
+    title: 'Track Pieces',
+    items: [
+      { keys: ['S'], description: 'Add straight track piece' },
+      { keys: ['C'], description: 'Add curved track piece' },
+      { keys: ['D'], description: 'Enter delete mode' },
+      { keys: ['Escape'], description: 'Clear selection / Exit mode' }
+    ]
+  },
+  {
+    title: 'Rotation',
+    items: [
+      { keys: ['R'], description: 'Rotate piece clockwise' },
+      { keys: ['Shift', 'R'], description: 'Rotate piece counter-clockwise' }
+    ]
+  },
+  {
+    title: 'View Controls',
+    items: [
+      { keys: ['Cmd/Ctrl', '0'], description: 'Reset zoom and center view' },
+      { keys: ['Mouse Wheel'], description: 'Zoom in/out' },
+      { keys: ['Click + Drag'], description: 'Pan the view' }
+    ]
+  },
+  {
+    title: 'Actions',
+    items: [
+      { keys: ['Cmd/Ctrl', 'Z'], description: 'Undo last action' },
+      { keys: ['Click'], description: 'Place piece / Delete piece (in delete mode)' },
+      { keys: ['Click + Drag'], description: 'Move existing piece' }
+    ]
+  },
+  {
+    title: 'Help',
+    items: [
+      { keys: ['?'], description: 'Show/hide this help dialog' }
+    ]
+  }
+];
 </script>
