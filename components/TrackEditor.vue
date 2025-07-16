@@ -57,6 +57,33 @@ function handleEnableDeleteMode() {
 function closeHelp() {
   showHelp.value = false;
 }
+async function handlePasteLayout() {
+  try {
+    let clipboardText = '';
+    
+    // Try to read from clipboard
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      clipboardText = await navigator.clipboard.readText();
+    } else {
+      // Fallback: prompt user to paste manually
+      clipboardText = prompt('Paste the layout JSON data:') || '';
+    }
+    
+    if (clipboardText.trim()) {
+      loadLayout(clipboardText);
+    } else {
+      copyStatus.value = 'No data to paste';
+      setTimeout(() => (copyStatus.value = ''), 2000);
+    }
+  } catch (err) {
+    console.error('Failed to paste:', err);
+    // Fallback: prompt user to paste manually
+    const clipboardText = prompt('Paste the layout JSON data:') || '';
+    if (clipboardText.trim()) {
+      loadLayout(clipboardText);
+    }
+  }
+}
 
 onMounted(() => {
   initCanvas();
@@ -108,6 +135,12 @@ onUnmounted(() => {
         class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
       >
         📋 Copy schema
+      </button>
+      <button 
+        @click="handlePasteLayout"
+        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+      >
+        📄 Paste schema
       </button>
       <button 
         @click="clearPieces"

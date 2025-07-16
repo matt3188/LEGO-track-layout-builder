@@ -190,16 +190,46 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function copyLayout(): void {
     const json = JSON.stringify(pieces.value, null, 2);
-    navigator.clipboard
-      .writeText(json)
-      .then(() => {
-        copyStatus.value = 'Copied!';
-        setTimeout(() => (copyStatus.value = ''), 2000);
-      })
-      .catch((err) => {
-        copyStatus.value = 'Failed to copy';
-        console.error('Copy failed:', err);
-      });
+    
+    // Check if clipboard API is available
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(json)
+        .then(() => {
+          copyStatus.value = 'Copied!';
+          setTimeout(() => (copyStatus.value = ''), 2000);
+        })
+        .catch((err) => {
+          copyStatus.value = 'Failed to copy';
+          console.error('Copy failed:', err);
+          fallbackCopy(json);
+        });
+    } else {
+      // Fallback for environments without clipboard API
+      fallbackCopy(json);
+    }
+  }
+
+  function fallbackCopy(text: string): void {
+    try {
+      // Create a temporary textarea element
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      copyStatus.value = 'Copied!';
+      setTimeout(() => (copyStatus.value = ''), 2000);
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      copyStatus.value = 'Copy failed - please copy manually';
+      console.log('Layout JSON:', text);
+      setTimeout(() => (copyStatus.value = ''), 3000);
+    }
   }
 
   function addStraight(): void {
