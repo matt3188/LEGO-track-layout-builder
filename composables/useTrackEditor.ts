@@ -7,6 +7,7 @@ interface TrackPiece {
   y: number;
   type: TrackPieceType;
   rotation: number;
+  flipped?: boolean;
 }
 
 interface GhostPiece extends TrackPiece {}
@@ -116,6 +117,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     ctx.save();
     ctx.translate(posX, posY);
     ctx.rotate(piece.rotation);
+    
+    // Apply horizontal flip if the piece is flipped
+    if (piece.flipped) {
+      ctx.scale(-1, 1);
+    }
 
     // Set alpha and color based on state
     if (isGhost) {
@@ -209,7 +215,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       x: snappedX, 
       y: snappedY, 
       type: 'straight', 
-      rotation: 0 
+      rotation: 0,
+      flipped: false
     };
     isDeleteMode.value = false;
     hoveredPiece.value = null;
@@ -229,7 +236,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       x: snappedX, 
       y: snappedY, 
       type: 'curve', 
-      rotation: 0 
+      rotation: 0,
+      flipped: false
     };
     isDeleteMode.value = false;
     hoveredPiece.value = null;
@@ -303,6 +311,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       y,
       type: selectedPieceType.value as Exclude<TrackPieceType, null>,
       rotation: ghostPiece.value.rotation,
+      flipped: ghostPiece.value.flipped || false,
     };
     redraw();
   }
@@ -402,11 +411,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     // Handle rotation for dragged pieces
     if (handleDraggedPieceRotation(e)) return;
     
+    // Handle flip for dragged pieces
+    if (handleDraggedPieceFlip(e)) return;
+    
     // Handle escape key for dragged pieces
     if (handleDraggedPieceEscape(e)) return;
     
     // Handle rotation for ghost pieces
     if (handleGhostPieceRotation(e)) return;
+    
+    // Handle flip for ghost pieces
+    if (handleGhostPieceFlip(e)) return;
     
     // Handle piece placement shortcuts
     if (handlePiecePlacement(e)) return;
@@ -449,6 +464,26 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     return true;
   }
 
+  function handleDraggedPieceFlip(e: KeyboardEvent): boolean {
+    if (!draggingPiece.value || (e.key !== 'f' && e.key !== 'F')) {
+      return false;
+    }
+    
+    draggingPiece.value.flipped = !draggingPiece.value.flipped;
+    redraw();
+    return true;
+  }
+
+  function handleGhostPieceFlip(e: KeyboardEvent): boolean {
+    if (!ghostPiece.value || (e.key !== 'f' && e.key !== 'F')) {
+      return false;
+    }
+    
+    ghostPiece.value.flipped = !ghostPiece.value.flipped;
+    redraw();
+    return true;
+  }
+
   function handlePiecePlacement(e: KeyboardEvent): boolean {
     const pieceTypeMap: Record<string, TrackPieceType> = {
       's': 'straight',
@@ -483,6 +518,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       y: snappedY,
       type: newPieceType,
       rotation: 0,
+      flipped: false,
     };
     
     redraw();
