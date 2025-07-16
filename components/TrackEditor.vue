@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 
 const canvas = ref(null);
 const copyStatus = ref('');
@@ -29,6 +29,57 @@ const {
   copyStatus,
 });
 
+// Define control buttons configuration
+const controlButtons = computed(() => [
+  {
+    label: '➕ Add Straight',
+    action: addStraight,
+    class: 'button-default'
+  },
+  {
+    label: '➕ Add Curve',
+    action: addCurve,
+    class: 'button-default'
+  },
+  {
+    label: '🗑️ Delete Mode',
+    action: enableDeleteMode,
+    class: isDeleteMode.value ? 'button-delete-active' : 'button-default'
+  },
+  {
+    label: '↩️ Undo',
+    action: undoLastAction,
+    class: 'button-default'
+  },
+  {
+    label: '📋 Copy schema',
+    action: copyLayout,
+    class: 'button-default'
+  },
+  {
+    label: '📄 Paste schema',
+    action: () => handlePasteLayout(),
+    class: 'button-default'
+  },
+  {
+    label: '❌ Clear',
+    action: clearPieces,
+    class: 'button-default'
+  },
+  {
+    label: '🤖 Auto Layout',
+    action: () => showAutoLayout.value = true,
+    class: 'button-primary'
+  }
+]);
+
+// Button style classes
+const buttonClasses = {
+  'button-default': 'px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100',
+  'button-delete-active': 'px-4 py-2 border rounded cursor-pointer transition-colors duration-200 bg-red-500 text-white border-red-600',
+  'button-primary': 'px-4 py-2 border border-gray-300 rounded bg-blue-500 text-white cursor-pointer transition-colors duration-200 hover:bg-blue-600'
+};
+
 function handleGlobalKeyDown(e) {
   // Handle help modal toggle
   if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
@@ -47,22 +98,6 @@ function handleGlobalKeyDown(e) {
   if (!showHelp.value) {
     handleKeyDown(e);
   }
-}
-
-function handleAddStraight() {
-  addStraight();
-}
-
-function handleAddCurve() {
-  addCurve();
-}
-
-function handleEnableDeleteMode() {
-  enableDeleteMode();
-}
-
-function closeHelp() {
-  showHelp.value = false;
 }
 
 function handleGenerateAutoLayout() {
@@ -115,57 +150,12 @@ onUnmounted(() => {
     <!-- Controls Panel -->
     <div class="fixed top-4 left-4 flex flex-col gap-2">
       <button 
-        @click="handleAddStraight"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
+        v-for="button in controlButtons"
+        :key="button.label"
+        @click="button.action"
+        :class="buttonClasses[button.class]"
       >
-        ➕ Add Straight
-      </button>
-      <button 
-        @click="handleAddCurve"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
-      >
-        ➕ Add Curve
-      </button>
-      <button 
-        @click="handleEnableDeleteMode" 
-        :class="[
-          'px-4 py-2 border rounded cursor-pointer transition-colors duration-200',
-          isDeleteMode 
-            ? 'bg-red-500 text-white border-red-600' 
-            : 'border-gray-300 bg-white hover:bg-gray-100'
-        ]"
-      >
-        🗑️ Delete Mode
-      </button>
-      <button 
-        @click="undoLastAction"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
-      >
-        ↩️ Undo
-      </button>
-      <button 
-        @click="copyLayout"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
-      >
-        📋 Copy schema
-      </button>
-      <button 
-        @click="handlePasteLayout"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
-      >
-        📄 Paste schema
-      </button>
-      <button 
-        @click="clearPieces"
-        class="px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100"
-      >
-        ❌ Clear
-      </button>
-      <button 
-        @click="showAutoLayout = true"
-        class="px-4 py-2 border border-gray-300 rounded bg-blue-500 text-white cursor-pointer transition-colors duration-200 hover:bg-blue-600"
-      >
-        🤖 Auto Layout
+        {{ button.label }}
       </button>
       <span class="text-sm text-gray-600">{{ copyStatus }}</span>
     </div>
@@ -237,6 +227,6 @@ onUnmounted(() => {
     </div>
 
     <!-- Help Modal -->
-    <HelpModal :show="showHelp" @close="closeHelp" />
+    <HelpModal :show="showHelp" @close="() => showHelp = false" />
   </div>
 </template>
