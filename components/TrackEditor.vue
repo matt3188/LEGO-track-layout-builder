@@ -11,7 +11,6 @@ const {
   enableDeleteMode,
   undoLastAction,
   copyLayout,
-  updateRotationDisplay,
   handleKeyDown,
   initCanvas,
   cleanup,

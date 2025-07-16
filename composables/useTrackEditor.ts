@@ -19,7 +19,6 @@ interface UseTrackEditorOptions {
 export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const pieces = ref<TrackPiece[]>([]);
   const zoom = ref(1);
-  const rotationDisplay = ref('');
   let offsetX = 0;
   let offsetY = 0;
   const offsetPanX = ref(0);
@@ -195,17 +194,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
         copyStatus.value = 'Failed to copy';
         console.error('Copy failed:', err);
       });
-  }
-
-  function updateRotationDisplay(): void {
-    if (draggingPiece.value) {
-      const degrees = ((draggingPiece.value.rotation * 180) / Math.PI).toFixed(
-        1
-      );
-      rotationDisplay.value = `Rotation: ${degrees}°`;
-    } else {
-      rotationDisplay.value = '';
-    }
   }
 
   function addStraight(): void {
@@ -397,7 +385,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       saveHistoryIfChanged();
     }
     isPanning.value = false;
-    updateRotationDisplay();
   }
 
   function handleWheel(e: WheelEvent): void {
@@ -569,7 +556,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     clearPieces,
     undoLastAction,
     copyLayout,
-    updateRotationDisplay,
     handleKeyDown,
     initCanvas,
     cleanup,
