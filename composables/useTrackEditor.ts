@@ -1,3 +1,5 @@
+import { ref, type Ref } from '#imports';
+
 type TrackPieceType = 'straight' | 'curve' | null;
 
 interface TrackPiece {
@@ -15,11 +17,11 @@ interface UseTrackEditorOptions {
 }
 
 export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
-  const pieces = ref([]);
+  const pieces = ref<TrackPiece[]>([]);
   const zoom = ref(1);
   const rotationDisplay = ref('');
-  let offsetX = ref(0);
-  let offsetY = ref(0);
+  let offsetX = 0;
+  let offsetY = 0;
   const offsetPanX = ref(0);
   const offsetPanY = ref(0);
   const isPanning = ref(false);
@@ -27,15 +29,46 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const panStartY = ref(0);
   const selectedPieceType = ref<TrackPieceType>(null);
   const ghostPiece = ref<GhostPiece | null>(null);
-  const draggingPiece = ref(null);
+  const draggingPiece = ref<TrackPiece | null>(null);
+  const hoveredPiece = ref<TrackPiece | null>(null);
+  const isDeleteMode = ref(false);
   const lastMouseX = ref(0);
   const lastMouseY = ref(0);
-  const historyStack = ref([]);
+  const historyStack = ref<TrackPiece[][]>([]);
   const baseGridSize = 32;
   let ctx: CanvasRenderingContext2D | null = null;
 
   function getGridSize(): number {
     return baseGridSize * zoom.value;
+  }
+
+  function findPieceAtPosition(mouseX: number, mouseY: number): TrackPiece | null {
+    for (const piece of pieces.value) {
+      const [px, py] = toCanvasCoords(piece.x, piece.y);
+      const dx = mouseX - px;
+      const dy = mouseY - py;
+
+      const localX = dx * Math.cos(-piece.rotation) - dy * Math.sin(-piece.rotation);
+      const localY = dx * Math.sin(-piece.rotation) + dy * Math.cos(-piece.rotation);
+
+      if (piece.type === 'straight') {
+        if (Math.abs(localX) < 64 * zoom.value && Math.abs(localY) < 16 * zoom.value) {
+          return piece;
+        }
+      } else if (piece.type === 'curve') {
+        const dist = Math.sqrt(localX ** 2 + localY ** 2);
+        const angle = Math.atan2(localY, localX);
+        if (
+          dist >= 312 * zoom.value &&
+          dist <= 328 * zoom.value &&
+          angle >= 0 &&
+          angle <= Math.PI / 8
+        ) {
+          return piece;
+        }
+      }
+    }
+    return null;
   }
 
   function toCanvasCoords(x: number, y: number): [number, number] {
@@ -77,16 +110,27 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
-  function drawTrackPiece(piece: TrackPiece, isGhost = false): void {
+  function drawTrackPiece(piece: TrackPiece, isGhost = false, isHovered = false): void {
     if (!ctx) return;
 
     const [posX, posY] = toCanvasCoords(piece.x, piece.y);
     ctx.save();
     ctx.translate(posX, posY);
     ctx.rotate(piece.rotation);
-    ctx.globalAlpha = isGhost ? 0.4 : 1;
 
-    ctx.fillStyle = '#000';
+    // Set alpha and color based on state
+    if (isGhost) {
+      ctx.globalAlpha = 0.4;
+    } else if (isHovered && isDeleteMode.value) {
+      ctx.globalAlpha = 0.7;
+    } else {
+      ctx.globalAlpha = 1;
+    }
+
+    // Set color - red for hovered pieces in delete mode, black otherwise
+    const pieceColor = (isHovered && isDeleteMode.value) ? '#ff0000' : '#000';
+    ctx.fillStyle = pieceColor;
+    ctx.strokeStyle = pieceColor;
     ctx.lineWidth = 8 * zoom.value;
 
     if (piece.type === 'straight') {
@@ -101,7 +145,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       ctx.arc(0, 0, 320 * zoom.value, 0, Math.PI / 8);
       if (isGhost) ctx.translate(-160 * zoom.value, 0);
       ctx.lineWidth = 16 * zoom.value;
-      ctx.strokeStyle = '#000';
       ctx.stroke();
     }
 
@@ -119,7 +162,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
     drawGrid();
     drawGhostPiece();
-    pieces.value.forEach((p) => drawTrackPiece(p));
+    pieces.value.forEach((p) => {
+      const isHovered = hoveredPiece.value === p;
+      drawTrackPiece(p, false, isHovered);
+    });
   }
 
   function saveHistoryIfChanged(): void {
@@ -174,6 +220,25 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function clearSelection(): void {
     selectedPieceType.value = null;
+    ghostPiece.value = null;
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+  }
+
+  function enableDeleteMode(): void {
+    isDeleteMode.value = true;
+    selectedPieceType.value = null;
+    ghostPiece.value = null;
+  }
+
+  function deletePiece(piece: TrackPiece): void {
+    const index = pieces.value.indexOf(piece);
+    if (index > -1) {
+      saveHistoryIfChanged();
+      pieces.value.splice(index, 1);
+      hoveredPiece.value = null;
+      redraw();
+    }
   }
 
   function clearPieces(): void {
@@ -189,11 +254,23 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleClick(e: MouseEvent): void {
-    if (!ghostPiece.value || !canvas.value) return;
+    if (!canvas.value) return;
     const rect = canvas.value.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
+    // Handle delete mode
+    if (isDeleteMode.value) {
+      const pieceToDelete = findPieceAtPosition(mouseX, mouseY);
+      if (pieceToDelete) {
+        deletePiece(pieceToDelete);
+      }
+      return;
+    }
+
+    // Handle normal piece placement
+    if (!ghostPiece.value) return;
+    
     const gridSize = getGridSize();
     const [centerX, centerY] = toCanvasCoords(0, 0);
 
@@ -217,51 +294,27 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     const mouseY = e.clientY - rect.top;
     const gridSize = getGridSize();
 
+    // Don't allow dragging in delete mode
+    if (isDeleteMode.value) return;
+
     isPanning.value = true;
     panStartX.value = mouseX;
     panStartY.value = mouseY;
 
-    for (const piece of pieces.value) {
-      const [px, py] = toCanvasCoords(piece.x, piece.y);
-      const dx = mouseX - px;
-      const dy = mouseY - py;
-
-      const localX =
-        dx * Math.cos(-piece.rotation) - dy * Math.sin(-piece.rotation);
-      const localY =
-        dx * Math.sin(-piece.rotation) + dy * Math.cos(-piece.rotation);
-
-      if (
-        piece.type === 'straight' &&
-        Math.abs(localX) < 64 * zoom.value &&
-        Math.abs(localY) < 16 * zoom.value
-      ) {
-        draggingPiece.value = piece;
-        offsetX = (mouseX - px) / gridSize;
-        offsetY = (mouseY - py) / gridSize;
-        isPanning.value = false;
-        break;
-      } else if (piece.type === 'curve') {
-        const dist = Math.sqrt(localX ** 2 + localY ** 2);
-        const angle = Math.atan2(localY, localX);
-        if (
-          dist >= 312 * zoom.value &&
-          dist <= 328 * zoom.value &&
-          angle >= 0 &&
-          angle <= Math.PI / 8
-        ) {
-          draggingPiece.value = piece;
-          offsetX = (mouseX - px) / gridSize;
-          offsetY = (mouseY - py) / gridSize;
-          isPanning.value = false;
-          break;
-        }
-      }
+    const pieceAtPosition = findPieceAtPosition(mouseX, mouseY);
+    if (pieceAtPosition) {
+      draggingPiece.value = pieceAtPosition;
+      const [px, py] = toCanvasCoords(pieceAtPosition.x, pieceAtPosition.y);
+      offsetX = (mouseX - px) / gridSize;
+      offsetY = (mouseY - py) / gridSize;
+      isPanning.value = false;
     }
+    
     saveHistoryIfChanged();
   }
 
   function handleMouseMove(e: MouseEvent): void {
+    if (!canvas.value) return;
     const rect = canvas.value.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -270,14 +323,27 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
     const gridSize = getGridSize();
 
-    if (ghostPiece.value) {
+    // Update cursor style based on mode
+    if (isDeleteMode.value) {
+      canvas.value.style.cursor = 'crosshair';
+      // Update hovered piece for delete mode
+      const pieceUnderMouse = findPieceAtPosition(mouseX, mouseY);
+      if (hoveredPiece.value !== pieceUnderMouse) {
+        hoveredPiece.value = pieceUnderMouse;
+        redraw();
+      }
+    } else {
+      canvas.value.style.cursor = draggingPiece.value ? 'grabbing' : 'default';
+    }
+
+    if (ghostPiece.value && !isDeleteMode.value) {
       const [px, py] = toCanvasCoords(0, 0);
       ghostPiece.value.x = Math.round((mouseX - px) / gridSize);
       ghostPiece.value.y = Math.round((mouseY - py) / gridSize);
       redraw();
     }
 
-    if (draggingPiece.value) {
+    if (draggingPiece.value && !isDeleteMode.value) {
       const [px, py] = toCanvasCoords(0, 0);
       const snapX = Math.round((mouseX - px) / gridSize - offsetX);
       const snapY = Math.round((mouseY - py) / gridSize - offsetY);
@@ -304,7 +370,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function handleWheel(e: WheelEvent): void {
     e.preventDefault();
-    const delta = Math.sign(e.deltaY);
+    const delta = e.deltaY > 0 ? 1 : e.deltaY < 0 ? -1 : 0;
     if (delta < 0) {
       zoom.value = Math.min(zoom.value * 1.1, 4);
     } else {
@@ -314,81 +380,112 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleKeyDown(e: KeyboardEvent): void {
-    if (draggingPiece.value && (e.key === 'r' || e.key === 'R')) {
-      const step =
-        draggingPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
-      draggingPiece.value.rotation =
-        (draggingPiece.value.rotation + step) % (2 * Math.PI);
-      redraw();
-      return;
-    }
+    // Handle rotation for dragged pieces
+    if (handleDraggedPieceRotation(e)) return;
+    
+    // Handle escape key for dragged pieces
+    if (handleDraggedPieceEscape(e)) return;
+    
+    // Handle rotation for ghost pieces
+    if (handleGhostPieceRotation(e)) return;
+    
+    // Handle piece placement shortcuts
+    if (handlePiecePlacement(e)) return;
+    
+    // Handle view controls (zoom reset and undo)
+    handleViewControls(e);
+  }
 
-    if (draggingPiece.value && e.key === 'esc') {
-      clearSelection();
+  function handleDraggedPieceRotation(e: KeyboardEvent): boolean {
+    if (!draggingPiece.value || (e.key !== 'r' && e.key !== 'R')) {
+      return false;
     }
+    
+    const rotationStep = draggingPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+    draggingPiece.value.rotation = (draggingPiece.value.rotation + rotationStep) % (2 * Math.PI);
+    redraw();
+    return true;
+  }
 
-    if (ghostPiece.value && (e.key === 'r' || e.key === 'R')) {
-      const step =
-        ghostPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
-      const direction = e.shiftKey ? -1 : 1;
-      ghostPiece.value.rotation =
-        (ghostPiece.value.rotation + direction * step + 2 * Math.PI) %
-        (2 * Math.PI);
-      redraw();
-      return;
+  function handleDraggedPieceEscape(e: KeyboardEvent): boolean {
+    if (!draggingPiece.value || e.key !== 'Escape') {
+      return false;
     }
+    
+    clearSelection();
+    return true;
+  }
 
+  function handleGhostPieceRotation(e: KeyboardEvent): boolean {
+    if (!ghostPiece.value || (e.key !== 'r' && e.key !== 'R')) {
+      return false;
+    }
+    
+    const rotationStep = ghostPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+    const direction = e.shiftKey ? -1 : 1;
+    
+    ghostPiece.value.rotation = 
+      (ghostPiece.value.rotation + direction * rotationStep + 2 * Math.PI) % (2 * Math.PI);
+    redraw();
+    return true;
+  }
+
+  function handlePiecePlacement(e: KeyboardEvent): boolean {
+    const pieceTypeMap: Record<string, TrackPieceType> = {
+      's': 'straight',
+      'c': 'curve',
+      'd': null, // Delete mode
+      'Escape': null
+    };
+    
+    const newPieceType = pieceTypeMap[e.key];
+    if (newPieceType === undefined) {
+      return false;
+    }
+    
+    // Handle delete mode
+    if (e.key === 'd') {
+      enableDeleteMode();
+      return true;
+    }
+    
+    // Calculate current mouse position on grid
     const gridSize = getGridSize();
     const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
     const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
     const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    
+    // Update selection and ghost piece
+    selectedPieceType.value = newPieceType;
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+    ghostPiece.value = {
+      x: snappedX,
+      y: snappedY,
+      type: newPieceType,
+      rotation: 0,
+    };
+    
+    redraw();
+    return true;
+  }
 
-    if (e.key === 's') {
-      selectedPieceType.value = 'straight';
-      ghostPiece.value = {
-        x: snappedX,
-        y: snappedY,
-        type: selectedPieceType.value,
-        rotation: 0,
-      };
+  function handleViewControls(e: KeyboardEvent): void {
+    const isMac = navigator.userAgent.toLowerCase().indexOf('mac') !== -1;
+    const isMetaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+    
+    // Handle zoom reset (Cmd/Ctrl + 0)
+    if (isMetaOrCtrl && e.key === '0') {
+      e.preventDefault();
+      zoom.value = 1;
+      offsetPanX.value = 0;
+      offsetPanY.value = 0;
       redraw();
-    } else if (e.key === 'c') {
-      selectedPieceType.value = 'curve';
-      ghostPiece.value = {
-        x: snappedX,
-        y: snappedY,
-        type: selectedPieceType.value,
-        rotation: 0,
-      };
-      redraw();
-    } else if (e.key === 'Escape') {
-      ghostPiece.value = {
-        x: snappedX,
-        y: snappedY,
-        type: null,
-        rotation: 0,
-      };
-      selectedPieceType.value = null;
-      redraw();
+      return;
     }
-
-    const isMac = navigator.userAgent.toLowerCase().includes('mac');
-    const undoKey = isMac
-      ? e.metaKey && e.key === 'z'
-      : e.ctrlKey && e.key === 'z';
-
-    if ((isMac && e.metaKey) || (!isMac && e.ctrlKey)) {
-      if (e.key === '0') {
-        e.preventDefault();
-        zoom.value = 1;
-        offsetPanX.value = 0;
-        offsetPanY.value = 0;
-        redraw();
-        return;
-      }
-    }
-
-    if (undoKey) {
+    
+    // Handle undo (Cmd/Ctrl + Z)
+    if (isMetaOrCtrl && e.key === 'z') {
       e.preventDefault();
       undoLastAction();
     }
@@ -404,7 +501,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     el.addEventListener('mouseup', handleMouseUp);
     el.addEventListener('click', handleClick);
     el.addEventListener('wheel', handleWheel, { passive: false });
-    ctx = canvas.value.getContext('2d');
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     redraw();
@@ -425,7 +521,9 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     pieces,
     ghostPiece,
     draggingPiece,
+    hoveredPiece,
     selectedPieceType,
+    isDeleteMode,
     historyStack,
     isPanning,
     panStartX,
@@ -434,6 +532,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     lastMouseY,
     addStraight,
     addCurve,
+    enableDeleteMode,
     clearSelection,
     clearPieces,
     undoLastAction,
