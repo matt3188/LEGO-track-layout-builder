@@ -38,6 +38,9 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const baseGridSize = 32;
   let ctx: CanvasRenderingContext2D | null = null;
 
+  // Import auto-layout functionality
+  const { generateAutoLayout: generateAutoLayoutPieces } = useAutoLayout();
+
   function getGridSize(): number {
     return baseGridSize * zoom.value;
   }
@@ -602,6 +605,70 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     window.removeEventListener('resize', resizeCanvas);
   }
 
+  function generateAutoLayout(straightCount: number, curveCount: number): void {
+    // Clear existing pieces and save to history
+    saveHistoryIfChanged();
+    pieces.value = [];
+    
+    // Generate new layout using the auto-layout composable
+    const newPieces = generateAutoLayoutPieces(straightCount, curveCount);
+    pieces.value = newPieces;
+    
+    // Center the view on the generated layout
+    offsetPanX.value = 0;
+    offsetPanY.value = 0;
+    
+    redraw();
+  }
+  
+  function loadLayout(jsonData: string): void {
+    try {
+      const parsedPieces = JSON.parse(jsonData);
+      
+      // Validate the data structure
+      if (!Array.isArray(parsedPieces)) {
+        throw new Error('Invalid layout data: expected an array');
+      }
+      
+      // Validate each piece has required properties
+      for (const piece of parsedPieces) {
+        if (typeof piece.x !== 'number' || typeof piece.y !== 'number' || 
+            !piece.type || typeof piece.rotation !== 'number') {
+          throw new Error('Invalid piece data: missing required properties');
+        }
+        
+        if (piece.type !== 'straight' && piece.type !== 'curve') {
+          throw new Error(`Invalid piece type: ${piece.type}`);
+        }
+      }
+      
+      // Save current state to history before loading
+      saveHistoryIfChanged();
+      
+      // Load the new layout
+      pieces.value = parsedPieces.map(piece => ({
+        x: piece.x,
+        y: piece.y,
+        type: piece.type,
+        rotation: piece.rotation,
+        flipped: piece.flipped || false
+      }));
+      
+      // Center the view on the loaded layout
+      offsetPanX.value = 0;
+      offsetPanY.value = 0;
+      
+      redraw();
+      copyStatus.value = 'Layout loaded!';
+      setTimeout(() => (copyStatus.value = ''), 2000);
+      
+    } catch (err) {
+      console.error('Failed to load layout:', err);
+      copyStatus.value = 'Invalid layout data';
+      setTimeout(() => (copyStatus.value = ''), 3000);
+    }
+  }
+
   return {
     pieces,
     ghostPiece,
@@ -625,5 +692,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     handleKeyDown,
     initCanvas,
     cleanup,
+    generateAutoLayout,
+    loadLayout,
   };
 }
