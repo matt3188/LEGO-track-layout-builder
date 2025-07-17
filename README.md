@@ -1,11 +1,27 @@
 # LEGO track layout builder
 
 🏗️ Work in progress 🚧
+https://matt3188.github.io/LEGO-track-layout-builder/
 
 As a LEGO enthusiast I wanted to create something that the community could use
 to build out track layouts; Both from scratch and with the help of AI.
 
+Current features:
+- Add straight and curve pieces to create a layout
+- Delete individual track pieces
+- Clear all pieces
+- Rotate pieces
+- Flip pieces
+- Ghost piece to see the placement and orientation
+- Undo track placement
+- Copy your track schema
+- Paste your track schema
+- Auto layout - enter number of straight and curved pieces in your collection and see what layout is possible
+- Keyboard shortcuts
 
-Scope of work for an MVP will be:
-- Select and place straight and curved track to form a complete layout
-- Export a list of parts and there count in order to build the layout
+Upcoming features:
+- Add more track pieces
+- Improve track look
+- Improve placing curve pieces
+
+Feature request - please raise an [issue](https://github.com/matt3188/LEGO-track-layout-builder/issues/new) and add the 'enhancement' label
