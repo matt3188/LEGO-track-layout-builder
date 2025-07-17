@@ -25,7 +25,6 @@ const {
   handleKeyDown,
   initCanvas,
   cleanup,
-  historyStack,
   clearPieces,
   isDeleteMode,
 } = useTrackEditor({
@@ -67,6 +66,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  cleanup();
   window.removeEventListener('keydown', handleGlobalKeyDown);
 });
 </script>
