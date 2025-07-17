@@ -1,16 +1,5 @@
 import { ref, type Ref } from '#imports';
-
-type TrackPieceType = 'straight' | 'curve' | null;
-
-interface TrackPiece {
-  x: number;
-  y: number;
-  type: TrackPieceType;
-  rotation: number;
-  flipped?: boolean;
-}
-
-interface GhostPiece extends TrackPiece {}
+import { renderTrackPiece, type TrackPiece, type GhostPiece, type TrackPieceType } from './trackPieces';
 
 interface UseTrackEditorOptions {
   canvas: Ref<HTMLCanvasElement | null>;
@@ -126,7 +115,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       ctx.scale(-1, 1);
     }
 
-    // Set alpha and color based on state
+    // Set alpha based on state
     if (isGhost) {
       ctx.globalAlpha = 0.4;
     } else if (isHovered && isDeleteMode.value) {
@@ -135,26 +124,14 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       ctx.globalAlpha = 1;
     }
 
-    // Set color - red for hovered pieces in delete mode, black otherwise
-    const pieceColor = (isHovered && isDeleteMode.value) ? '#ff0000' : '#000';
-    ctx.fillStyle = pieceColor;
-    ctx.strokeStyle = pieceColor;
-    ctx.lineWidth = 8 * zoom.value;
-
-    if (piece.type === 'straight') {
-      ctx.fillRect(
-        -64 * zoom.value,
-        -8 * zoom.value,
-        128 * zoom.value,
-        16 * zoom.value
-      );
-    } else if (piece.type === 'curve') {
-      ctx.beginPath();
-      ctx.arc(0, 0, 320 * zoom.value, 0, Math.PI / 8);
-      if (isGhost) ctx.translate(-160 * zoom.value, 0);
-      ctx.lineWidth = 16 * zoom.value;
-      ctx.stroke();
-    }
+    // Render the track piece using the modular system
+    renderTrackPiece(piece, {
+      ctx,
+      zoom: zoom.value,
+      isGhost,
+      isHovered,
+      isDeleteMode: isDeleteMode.value
+    });
 
     ctx.restore();
     ctx.globalAlpha = 1;
