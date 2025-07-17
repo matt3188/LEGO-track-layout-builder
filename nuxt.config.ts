@@ -6,6 +6,6 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss'
   ],
   app: {
-    baseURL: '/LEGO-track-layout-builder/',
+    baseURL: process.env.NODE_ENV === 'production' ? '/LEGO-track-layout-builder/' : '/',
   },
 })
