@@ -4,5 +4,8 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   modules: [
     '@nuxtjs/tailwindcss'
-  ]
+  ],
+  app: {
+    baseURL: '/LEGO-track-layout-builder/',
+  },
 })
