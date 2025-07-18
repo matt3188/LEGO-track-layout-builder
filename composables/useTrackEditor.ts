@@ -1,5 +1,13 @@
 import { ref, type Ref } from '#imports';
-import { renderTrackPiece, type TrackPiece, type GhostPiece, type TrackPieceType } from './trackPieces';
+import { 
+  renderTrackPiece, 
+  findSnapPosition, 
+  getConnectionIndicators,
+  type TrackPiece, 
+  type GhostPiece, 
+  type TrackPieceType,
+  type ConnectionPoint 
+} from './trackPieces';
 
 interface UseTrackEditorOptions {
   canvas: Ref<HTMLCanvasElement | null>;
@@ -18,12 +26,16 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const panStartY = ref(0);
   const selectedPieceType = ref<TrackPieceType>(null);
   const ghostPiece = ref<GhostPiece | null>(null);
+  const snappedGhostPiece = ref<GhostPiece | null>(null); // Snapped version of ghost piece
   const draggingPiece = ref<TrackPiece | null>(null);
   const hoveredPiece = ref<TrackPiece | null>(null);
   const isDeleteMode = ref(false);
+  const showConnectionPoints = ref(false); // Debug: show connection points
   const lastMouseX = ref(0);
   const lastMouseY = ref(0);
   const historyStack = ref<TrackPiece[][]>([]);
+  const hasDragged = ref(false); // Track if we've dragged during current mouse operation
+  const isShiftPressed = ref(false); // Track if shift is being held
   const baseGridSize = 32;
   let ctx: CanvasRenderingContext2D | null = null;
 
@@ -48,13 +60,22 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
           return piece;
         }
       } else if (piece.type === 'curve') {
-        const dist = Math.sqrt(localX ** 2 + localY ** 2);
-        const angle = Math.atan2(localY, localX);
+        // For curve pieces, we need to check relative to the curve's arc center
+        // The curve is offset by -radius from the piece center
+        const offsetX = localX + 320 * zoom.value; // Add back the offset
+        const offsetY = localY;
+        
+        const dist = Math.sqrt(offsetX ** 2 + offsetY ** 2);
+        const angle = Math.atan2(offsetY, offsetX);
+        
+        // Normalize angle to 0-2π range
+        const normalizedAngle = angle < 0 ? angle + 2 * Math.PI : angle;
+        
         if (
-          dist >= 312 * zoom.value &&
-          dist <= 328 * zoom.value &&
-          angle >= 0 &&
-          angle <= Math.PI / 8
+          dist >= 300 * zoom.value &&  // Inner radius
+          dist <= 340 * zoom.value &&  // Outer radius
+          normalizedAngle >= 0 &&
+          normalizedAngle <= Math.PI / 8
         ) {
           return piece;
         }
@@ -139,7 +160,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function drawGhostPiece(): void {
     if (!ghostPiece.value) return;
-    drawTrackPiece(ghostPiece.value, true);
+    
+    // Draw the snapped version if available, otherwise the regular ghost
+    const pieceToRender = snappedGhostPiece.value || ghostPiece.value;
+    drawTrackPiece(pieceToRender, true);
   }
 
   function redraw(): void {
@@ -257,6 +281,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   function clearSelection(): void {
     selectedPieceType.value = null;
     ghostPiece.value = null;
+    snappedGhostPiece.value = null;
     isDeleteMode.value = false;
     hoveredPiece.value = null;
   }
@@ -265,6 +290,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     isDeleteMode.value = true;
     selectedPieceType.value = null;
     ghostPiece.value = null;
+    snappedGhostPiece.value = null;
     hoveredPiece.value = null;
     redraw();
   }
@@ -291,47 +317,15 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     redraw();
   }
 
-  function handleClick(e: MouseEvent): void {
-    if (!canvas.value) return;
-    const rect = canvas.value.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Handle delete mode
-    if (isDeleteMode.value) {
-      const pieceToDelete = findPieceAtPosition(mouseX, mouseY);
-      if (pieceToDelete) {
-        deletePiece(pieceToDelete);
-      }
-      return;
-    }
-
-    // Handle normal piece placement
-    if (!ghostPiece.value) return;
-    
-    const gridSize = getGridSize();
-    const [centerX, centerY] = toCanvasCoords(0, 0);
-
-    const x = Math.round((mouseX - centerX) / gridSize);
-    const y = Math.round((mouseY - centerY) / gridSize);
-
-    pieces.value.push({ ...ghostPiece.value, x, y });
-    ghostPiece.value = {
-      x,
-      y,
-      type: selectedPieceType.value as Exclude<TrackPieceType, null>,
-      rotation: ghostPiece.value.rotation,
-      flipped: ghostPiece.value.flipped || false,
-    };
-    redraw();
-  }
-
   function handleMouseDown(e: MouseEvent): void {
     if (!canvas.value) return;
     const rect = canvas.value.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const gridSize = getGridSize();
+
+    // Reset drag tracking
+    hasDragged.value = false;
 
     // Don't allow dragging in delete mode
     if (isDeleteMode.value) return;
@@ -362,6 +356,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
     const gridSize = getGridSize();
 
+    // Track if we've moved the mouse (indicating a drag)
+    if (isPanning.value || draggingPiece.value) {
+      hasDragged.value = true;
+    }
+
     // Update cursor style based on mode
     if (isDeleteMode.value) {
       canvas.value.style.cursor = 'crosshair';
@@ -376,9 +375,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
 
     if (ghostPiece.value && !isDeleteMode.value) {
-      const [px, py] = toCanvasCoords(0, 0);
-      ghostPiece.value.x = Math.round((mouseX - px) / gridSize);
-      ghostPiece.value.y = Math.round((mouseY - py) / gridSize);
+      updateGhostPiecePosition(mouseX, mouseY);
       redraw();
     }
 
@@ -398,12 +395,77 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
-  function handleMouseUp(): void {
+  function handleMouseUp(e: MouseEvent): void {
     if (draggingPiece.value) {
       draggingPiece.value = null;
       saveHistoryIfChanged();
     }
     isPanning.value = false;
+    
+    // Don't place pieces if we were dragging (panning or moving pieces)
+    if (hasDragged.value) return;
+    
+    if (!canvas.value) return;
+    const rect = canvas.value.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Handle delete mode
+    if (isDeleteMode.value) {
+      const pieceToDelete = findPieceAtPosition(mouseX, mouseY);
+      if (pieceToDelete) {
+        deletePiece(pieceToDelete);
+      }
+      return;
+    }
+
+    // Handle normal piece placement
+    if (!selectedPieceType.value) return;
+    
+    // Calculate grid position
+    const gridSize = getGridSize();
+    const [centerX, centerY] = toCanvasCoords(0, 0);
+    const x = Math.round((mouseX - centerX) / gridSize);
+    const y = Math.round((mouseY - centerY) / gridSize);
+    
+    // Create piece to place - use snapped position if available, otherwise use calculated position
+    let pieceToPlace: TrackPiece;
+    
+    if (snappedGhostPiece.value) {
+      // Use snapped position
+      pieceToPlace = {
+        ...snappedGhostPiece.value
+      };
+    } else if (ghostPiece.value) {
+      // Use regular ghost position
+      pieceToPlace = {
+        ...ghostPiece.value
+      };
+    } else {
+      // Create new piece at cursor position
+      pieceToPlace = {
+        x,
+        y,
+        type: selectedPieceType.value,
+        rotation: 0,
+        flipped: false
+      };
+    }
+    
+    pieces.value.push(pieceToPlace);
+    
+    // Update ghost piece for next placement
+    ghostPiece.value = {
+      x,
+      y,
+      type: selectedPieceType.value,
+      rotation: ghostPiece.value?.rotation || 0,
+      flipped: ghostPiece.value?.flipped || false
+    };
+    
+    // Update ghost piece position and snapping
+    updateGhostPiecePosition(mouseX, mouseY);
+    redraw();
   }
 
   function handleWheel(e: WheelEvent): void {
@@ -418,6 +480,9 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleKeyDown(e: KeyboardEvent): void {
+    // Track shift key state
+    isShiftPressed.value = e.shiftKey;
+    
     // Handle rotation for dragged pieces
     if (handleDraggedPieceRotation(e)) return;
     
@@ -535,6 +600,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     return true;
   }
 
+  function handleKeyUp(e: KeyboardEvent): void {
+    // Track shift key state
+    isShiftPressed.value = e.shiftKey;
+  }
+
   function handleViewControls(e: KeyboardEvent): void {
     const isMac = navigator.userAgent.toLowerCase().indexOf('mac') !== -1;
     const isMetaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
@@ -564,8 +634,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     el.addEventListener('mousedown', handleMouseDown);
     el.addEventListener('mousemove', handleMouseMove);
     el.addEventListener('mouseup', handleMouseUp);
-    el.addEventListener('click', handleClick);
     el.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('keyup', handleKeyUp);
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     redraw();
@@ -577,8 +647,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     el.removeEventListener('mousedown', handleMouseDown);
     el.removeEventListener('mousemove', handleMouseMove);
     el.removeEventListener('mouseup', handleMouseUp);
-    el.removeEventListener('click', handleClick);
     el.removeEventListener('wheel', handleWheel);
+    window.removeEventListener('keyup', handleKeyUp);
     window.removeEventListener('resize', resizeCanvas);
   }
 
@@ -646,13 +716,46 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
+  function updateGhostPiecePosition(mouseX: number, mouseY: number): void {
+    if (!ghostPiece.value || isDeleteMode.value) return;
+    
+    const gridSize = getGridSize();
+    const [px, py] = toCanvasCoords(0, 0);
+    const newX = Math.round((mouseX - px) / gridSize);
+    const newY = Math.round((mouseY - py) / gridSize);
+    
+    // Update the base ghost piece position
+    ghostPiece.value.x = newX;
+    ghostPiece.value.y = newY;
+    
+    // Only try to snap if we're extremely close to a connection point (within 0.25 grid units)
+    // Also check if Shift is held down to disable snapping entirely
+    const snapResult = !isShiftPressed.value ? findSnapPosition(ghostPiece.value, pieces.value, 0.25) : null;
+    
+    if (snapResult) {
+      // Create snapped version, preserving user's flip state if snap doesn't require a flip
+      snappedGhostPiece.value = {
+        ...ghostPiece.value,
+        x: snapResult.position.x,
+        y: snapResult.position.y,
+        rotation: snapResult.rotation,
+        flipped: snapResult.flipped !== undefined ? snapResult.flipped : ghostPiece.value.flipped
+      };
+    } else {
+      // No snap found, use regular ghost piece
+      snappedGhostPiece.value = null;
+    }
+  }
+
   return {
     pieces,
     ghostPiece,
+    snappedGhostPiece,
     draggingPiece,
     hoveredPiece,
     selectedPieceType,
     isDeleteMode,
+    showConnectionPoints,
     historyStack,
     isPanning,
     panStartX,

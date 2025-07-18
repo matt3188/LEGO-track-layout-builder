@@ -27,6 +27,7 @@ const {
   cleanup,
   clearPieces,
   isDeleteMode,
+  showConnectionPoints,
 } = useTrackEditor({
   canvas,
   copyStatus,
@@ -75,7 +76,7 @@ onUnmounted(() => {
   <div>
     <canvas ref="canvas" id="trackCanvas" class="border border-gray-300 block"></canvas>
     
-    <ControlPanel 
+    <ControlPanel
       :copy-status="copyStatus"
       :is-delete-mode="isDeleteMode"
       :on-add-straight="addStraight"

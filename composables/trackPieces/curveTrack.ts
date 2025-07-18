@@ -16,14 +16,37 @@ export function drawCurveTrack(
   const trackWidth = 20 * zoom;
   const innerRadius = radius - trackWidth / 2;
   const outerRadius = radius + trackWidth / 2;
+  
+  // Determine curve direction based on whether it's flipped
+  const isFlipped = piece.flipped || false;
+  const curveDirection = isFlipped ? -1 : 1;
+  
   const startAngle = 0;
-  const endAngle = Math.PI / 8;
+  const endAngle = (Math.PI / 8) * curveDirection;
+  
+  // The offset is always -radius in the x direction for the base curve
+  // Canvas rotation will handle the actual orientation
+  const offsetX = -radius;
+  const offsetY = 0;
+  
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  
+  // For flipped curves, we need to flip the Y axis
+  if (isFlipped) {
+    ctx.scale(1, -1);
+  }
   
   // Draw the curved track base (hotdog shape)
   ctx.fillStyle = ballastColor;
   ctx.beginPath();
-  ctx.arc(0, 0, outerRadius, startAngle, endAngle);
-  ctx.arc(0, 0, innerRadius, endAngle, startAngle, true);
+  if (curveDirection > 0) {
+    ctx.arc(0, 0, outerRadius, startAngle, endAngle);
+    ctx.arc(0, 0, innerRadius, endAngle, startAngle, true);
+  } else {
+    ctx.arc(0, 0, outerRadius, startAngle, endAngle, true);
+    ctx.arc(0, 0, innerRadius, endAngle, startAngle);
+  }
   ctx.closePath();
   ctx.fill();
   
@@ -52,16 +75,13 @@ export function drawCurveTrack(
   
   // Inner rail
   ctx.beginPath();
-  ctx.arc(0, 0, innerRadius + 4 * zoom, startAngle, endAngle);
+  ctx.arc(0, 0, innerRadius + 4 * zoom, startAngle, endAngle, curveDirection < 0);
   ctx.stroke();
   
   // Outer rail
   ctx.beginPath();
-  ctx.arc(0, 0, outerRadius - 4 * zoom, startAngle, endAngle);
+  ctx.arc(0, 0, outerRadius - 4 * zoom, startAngle, endAngle, curveDirection < 0);
   ctx.stroke();
   
-  // Apply ghost offset for curves
-  if (isGhost) {
-    ctx.translate(-160 * zoom, 0);
-  }
+  ctx.restore();
 }
