@@ -166,21 +166,8 @@ export function canConnectWithRotation(
   const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
   
   if (normalizedAngleDiff < Math.PI / 24) { // 7.5 degrees tolerance
-    console.log('✅ Connection possible with rotation:', {
-      distance: distance.toFixed(3),
-      rotationNeeded: (snappedRotation * 180 / Math.PI).toFixed(1) + '°',
-      finalAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-      types: point1.type + ' ↔ ' + point2.type
-    });
     return { canConnect: true, rotationNeeded: snappedRotation };
   }
-  
-  console.log('❌ Cannot create valid connection:', {
-    distance: distance.toFixed(3),
-    rotationNeeded: (snappedRotation * 180 / Math.PI).toFixed(1) + '°',
-    finalAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-    maxAllowed: '7.5°'
-  });
   
   return { canConnect: false, rotationNeeded: 0 };
 }
@@ -231,11 +218,6 @@ export function validateTrackFlow(
     const isOpposite = Math.abs(normalizedAngleDiff - Math.PI) < Math.PI / 12; // 15 degrees from 180°
     
     if (!isParallel && !isOpposite) {
-      console.log('❌ Straight pieces not aligned:', {
-        piece1Rotation: (piece1.rotation * 180 / Math.PI).toFixed(1) + '°',
-        piece2Rotation: (piece2.rotation * 180 / Math.PI).toFixed(1) + '°',
-        angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
-      });
       return false;
     }
     
@@ -267,14 +249,6 @@ function validateStraightToCurve(
   const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
   
   if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
-    console.log('❌ Straight-to-curve connection angles not opposite:', {
-      straightPiece: `rotation ${(straightPiece.rotation * 180 / Math.PI).toFixed(1)}°`,
-      curvePiece: `rotation ${(curvePiece.rotation * 180 / Math.PI).toFixed(1)}°`,
-      straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
-      curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
-      connAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-      expected: '180°'
-    });
     return false;
   }
   
@@ -316,22 +290,10 @@ function validateStraightToCurve(
   
   // Check for impossible combinations based on connection point directions
   if (isStraightNorthSouth && isCurveEastWest) {
-    console.log('❌ Impossible connection: Straight North-South connections cannot connect to curve East-West connections:', {
-      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
-      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
-      issue: 'Connection point directions are perpendicular',
-      explanation: 'Straight has North-South connection points, curve has East-West connection points'
-    });
     return false;
   }
   
   if (isStraightEastWest && isCurveNorthSouth) {
-    console.log('❌ Impossible connection: Straight East-West connections cannot connect to curve North-South connections:', {
-      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
-      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
-      issue: 'Connection point directions are perpendicular',
-      explanation: 'Straight has East-West connection points, curve has North-South connection points'
-    });
     return false;
   }
   
@@ -357,22 +319,8 @@ function validateStraightToCurve(
   );
   
   if (!isValidOrientation) {
-    console.log('❌ Straight-to-curve piece orientations incompatible:', {
-      straightRotation: (normalizedStraightRot * 180 / Math.PI).toFixed(1) + '°',
-      curveRotation: (normalizedCurveRot * 180 / Math.PI).toFixed(1) + '°',
-      rotationDiff: (normalizedRotDiff * 180 / Math.PI).toFixed(1) + '°',
-      note: 'Pieces must be oriented to allow smooth track connections'
-    });
     return false;
   }
-  
-  console.log('✅ Straight-to-curve connection valid:', {
-    straightRotation: (normalizedStraightRot * 180 / Math.PI).toFixed(1) + '°',
-    curveRotation: (normalizedCurveRot * 180 / Math.PI).toFixed(1) + '°',
-    straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
-    curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
-    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
-  });
   
   return true;
 }
@@ -399,14 +347,6 @@ function validateCurveToStraight(
   const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
   
   if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
-    console.log('❌ Curve-to-straight connection angles not opposite:', {
-      curvePiece: `rotation ${(curvePiece.rotation * 180 / Math.PI).toFixed(1)}°`,
-      straightPiece: `rotation ${(straightPiece.rotation * 180 / Math.PI).toFixed(1)}°`,
-      curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
-      straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
-      connAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-      expected: '180°'
-    });
     return false;
   }
   
@@ -439,31 +379,13 @@ function validateCurveToStraight(
   
   // Check for impossible combinations based on connection point directions
   if (isCurveEastWest && isStraightNorthSouth) {
-    console.log('❌ Impossible connection: Curve East-West connections cannot connect to straight North-South connections:', {
-      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
-      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
-      issue: 'Connection point directions are perpendicular',
-      explanation: 'Curve has East-West connection points, straight has North-South connection points'
-    });
     return false;
   }
   
   if (isCurveNorthSouth && isStraightEastWest) {
-    console.log('❌ Impossible connection: Curve North-South connections cannot connect to straight East-West connections:', {
-      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
-      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
-      issue: 'Connection point directions are perpendicular',
-      explanation: 'Curve has North-South connection points, straight has East-West connection points'
-    });
     return false;
   }
-  
-  console.log('✅ Curve-to-straight connection valid:', {
-    curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
-    straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
-    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
-  });
-  
+
   return true;
 }
 
@@ -486,20 +408,8 @@ function validateCurveToCurve(
   const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
   
   if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
-    console.log('❌ Curve-to-curve angle mismatch:', {
-      curve1Angle: (angle1 * 180 / Math.PI).toFixed(1) + '°',
-      curve2Angle: (angle2 * 180 / Math.PI).toFixed(1) + '°',
-      angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-      expected: '180°'
-    });
     return false;
   }
-  
-  console.log('✅ Curve-to-curve connection valid:', {
-    curve1Angle: (angle1 * 180 / Math.PI).toFixed(1) + '°',
-    curve2Angle: (angle2 * 180 / Math.PI).toFixed(1) + '°',
-    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
-  });
   
   return true;
 }
@@ -563,14 +473,6 @@ export function findSnapPosition(
             
             // Skip if adjustment is too large (pieces are too far apart)
             if (adjustmentDistance > 0.5) { // More generous: 0.5 instead of 0.15
-              console.log('❌ Position adjustment too large:', {
-                adjustment: adjustmentDistance.toFixed(4),
-                maxAllowed: '0.5',
-                deltaX: deltaX.toFixed(4),
-                deltaY: deltaY.toFixed(4),
-                piece1Pos: `(${testPiece.x}, ${testPiece.y})`,
-                piece2Pos: `(${existingPiece.x}, ${existingPiece.y})`
-              });
               continue;
             }
             
@@ -588,17 +490,6 @@ export function findSnapPosition(
                 isReasonableConnection(snappedPiece, existingPiece, deltaX, deltaY)) {
               
               if (distance < bestDistance) {
-                console.log('🎯 Valid snap found:', {
-                  newPiece: testPiece.type,
-                  existingPiece: existingPiece.type,
-                  distance: distance.toFixed(3),
-                  rotationUsed: (testRotation * 180 / Math.PI).toFixed(1) + '°',
-                  angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-                  connectionTypes: newConn.type + ' ↔ ' + existingConn.type,
-                  positionAdjustment: `(${deltaX.toFixed(2)}, ${deltaY.toFixed(2)})`,
-                  flipped: testPiece.flipped
-                });
-                
                 bestSnap = {
                   position: {
                     x: snappedPiece.x,
@@ -608,18 +499,7 @@ export function findSnapPosition(
                   flipped: testPiece.flipped
                 };
                 bestDistance = distance;
-              }
-            } else {
-              // Simpler logging for debugging why snaps are rejected
-              console.log('❌ Failed final validation:', {
-                distance: distance.toFixed(3),
-                rotation: (testRotation * 180 / Math.PI).toFixed(1) + '°',
-                angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-                positionAdjustment: `(${deltaX.toFixed(2)}, ${deltaY.toFixed(2)})`,
-                trackFlowValid: validateTrackFlow(snappedPiece, existingPiece, newConn, existingConn),
-                overlapCheck: !wouldOverlap(snappedPiece, existingPiece),
-                reasonableConnection: isReasonableConnection(snappedPiece, existingPiece, deltaX, deltaY)
-              });
+              }              
             }
           }
         }
@@ -683,12 +563,6 @@ function isValidConnection(
     const isOpposite = Math.abs(normalizedAngleDiff - Math.PI) < Math.PI / 24; // 7.5 degrees from 180°
     
     if (!isParallel && !isOpposite) {
-      console.log('❌ Straight pieces not properly aligned:', {
-        piece1Rotation: (newPiece.rotation * 180 / Math.PI).toFixed(1) + '°',
-        piece2Rotation: (existingPiece.rotation * 180 / Math.PI).toFixed(1) + '°',
-        angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-        requirement: 'Must be parallel (0°) or opposite (180°) ±7.5°'
-      });
       return false;
     }
     
@@ -703,9 +577,6 @@ function isValidConnection(
   
   if ((newPiece.type === 'straight' && existingPiece.type === 'curve') ||
       (newPiece.type === 'curve' && existingPiece.type === 'straight')) {
-    // Straight to curve: allow more flexible connections
-    // The angle matching in canConnect ensures they're properly aligned
-    console.log('✅ Straight-curve connection geometry valid');
     return true;
   }
   
@@ -751,13 +622,7 @@ function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
         }
       }
     }
-    
-    console.log('⚠️ Potential overlap detected:', {
-      piece1: piece1.type,
-      piece2: piece2.type,
-      centerDistance: centerDistance.toFixed(3),
-      minDistance: minDistance
-    });
+
     return true;
   }
   
@@ -780,12 +645,6 @@ function hasValidGeometry(
   );
   
   if (connDistance > 0.05) { // Much stricter: 0.05 instead of 0.1
-    console.log('❌ Connection points too far apart:', {
-      distance: connDistance.toFixed(4),
-      maxAllowed: '0.05',
-      point1: `(${connection1.x.toFixed(2)}, ${connection1.y.toFixed(2)})`,
-      point2: `(${connection2.x.toFixed(2)}, ${connection2.y.toFixed(2)})`
-    });
     return false;
   }
   
@@ -812,24 +671,12 @@ function hasValidGeometry(
     
     // Connection point should be at the end of the straight piece (2 grid units from center)
     if (Math.abs(distanceFromStraightCenter - straightLength/2) > 0.1) {
-      console.log('❌ Straight piece connection not at end:', {
-        straightPiece: `(${straightPiece.x}, ${straightPiece.y})`,
-        connectionPoint: `(${straightConn.x.toFixed(2)}, ${straightConn.y.toFixed(2)})`,
-        distanceFromCenter: distanceFromStraightCenter.toFixed(3),
-        expected: (straightLength/2).toFixed(1)
-      });
       return false;
     }
     
     // Additional check: if connecting straight to straight, pieces should be ~4 units apart
     if (otherPiece.type === 'straight') {
       if (Math.abs(pieceDistance - 4) > 0.2) {
-        console.log('❌ Straight pieces invalid distance:', {
-          piece1Pos: `(${piece1.x}, ${piece1.y})`,
-          piece2Pos: `(${piece2.x}, ${piece2.y})`,
-          distance: pieceDistance.toFixed(3),
-          expected: '4.0 ± 0.2'
-        });
         return false;
       }
     }
@@ -843,21 +690,8 @@ function hasValidGeometry(
   const expectedAngleDiff = Math.PI; // 180 degrees
   
   if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
-    console.log('❌ Connection angles not properly opposite:', {
-      angle1: (angle1 * 180 / Math.PI).toFixed(1) + '°',
-      angle2: (angle2 * 180 / Math.PI).toFixed(1) + '°',
-      angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
-      expected: '180°'
-    });
     return false;
   }
-  
-  console.log('✅ Valid geometry confirmed:', {
-    connDistance: connDistance.toFixed(4),
-    pieceDistance: pieceDistance.toFixed(3),
-    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
-  });
-  
   return true;
 }
 
@@ -877,14 +711,6 @@ function isReasonableConnection(
   const maxAdjustment = 0.5; // More generous: 0.5 instead of 0.15
   
   if (adjustmentDistance > maxAdjustment) {
-    console.log('❌ Position adjustment too large in final check:', {
-      adjustment: adjustmentDistance.toFixed(4),
-      maxAllowed: maxAdjustment,
-      deltaX: deltaX.toFixed(4),
-      deltaY: deltaY.toFixed(4),
-      piece1Pos: `(${piece1.x}, ${piece1.y})`,
-      piece2Pos: `(${piece2.x}, ${piece2.y})`
-    });
     return false;
   }
   
@@ -1032,12 +858,6 @@ export function validateLayout(pieces: TrackPiece[]): { isValid: boolean; errors
   
   const isValid = errors.length === 0;
   
-  if (!isValid) {
-    console.log('🚨 Layout validation failed:', errors);
-  } else {
-    console.log('✅ Layout validation passed');
-  }
-  
   return { isValid, errors };
 }
 
@@ -1049,9 +869,6 @@ export function getConnectionIndicators(pieces: TrackPiece[]): ConnectionPoint[]
   
   for (const piece of pieces) {
     const connections = getConnectionPoints(piece);
-    console.log(`Piece ${piece.type} at (${piece.x}, ${piece.y}) rotation ${(piece.rotation * 180 / Math.PI).toFixed(1)}°:`, 
-      connections.map(c => `${c.type} at (${c.x.toFixed(2)}, ${c.y.toFixed(2)}) angle ${(c.angle * 180 / Math.PI).toFixed(1)}°`));
-    allConnections.push(...connections);
   }
   
   return allConnections;
