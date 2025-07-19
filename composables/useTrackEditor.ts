@@ -3,6 +3,7 @@ import {
   renderTrackPiece, 
   findSnapPosition, 
   getConnectionIndicators,
+  validateLayout,
   type TrackPiece, 
   type GhostPiece, 
   type TrackPieceType,
@@ -166,6 +167,48 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     drawTrackPiece(pieceToRender, true);
   }
 
+  function drawConnectionPoints(): void {
+    if (!ctx) return;
+    
+    // Get all connection points from all pieces
+    const allConnections = getConnectionIndicators(pieces.value);
+    
+    // Draw each connection point
+    for (const connection of allConnections) {
+      const [canvasX, canvasY] = toCanvasCoords(connection.x, connection.y);
+      
+      ctx.save();
+      
+      // Draw connection point as a colored circle
+      ctx.fillStyle = connection.type === 'male' ? '#ff0000' : '#0000ff'; // Red for male, blue for female
+      ctx.beginPath();
+      ctx.arc(canvasX, canvasY, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw angle indicator as a line
+      ctx.strokeStyle = connection.type === 'male' ? '#ff0000' : '#0000ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(canvasX, canvasY);
+      ctx.lineTo(
+        canvasX + Math.cos(connection.angle) * 20,
+        canvasY + Math.sin(connection.angle) * 20
+      );
+      ctx.stroke();
+      
+      // Draw connection info text
+      ctx.fillStyle = '#000000';
+      ctx.font = '12px Arial';
+      ctx.fillText(
+        `${connection.type}`, 
+        canvasX + 10, 
+        canvasY - 10
+      );
+      
+      ctx.restore();
+    }
+  }
+
   function redraw(): void {
     if (!ctx || !canvas.value) return;
     ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
@@ -175,6 +218,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       const isHovered = hoveredPiece.value === p;
       drawTrackPiece(p, false, isHovered);
     });
+    
+    // Draw connection points for debugging
+    if (showConnectionPoints.value) {
+      drawConnectionPoints();
+    }
   }
 
   function saveHistoryIfChanged(): void {
@@ -231,7 +279,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     } catch (err) {
       console.error('Fallback copy failed:', err);
       copyStatus.value = 'Copy failed - please copy manually';
-      console.log('Layout JSON:', text);
       setTimeout(() => (copyStatus.value = ''), 3000);
     }
   }
@@ -239,15 +286,15 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   function addStraight(): void {
     selectedPieceType.value = 'straight';
     
-    // Calculate current mouse position on grid
+    // Use current mouse position without grid snapping
     const gridSize = getGridSize();
     const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
-    const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
-    const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    const mouseX = (lastMouseX.value - canvasCenterX) / gridSize;
+    const mouseY = (lastMouseY.value - canvasCenterY) / gridSize;
     
     ghostPiece.value = { 
-      x: snappedX, 
-      y: snappedY, 
+      x: mouseX, 
+      y: mouseY, 
       type: 'straight', 
       rotation: 0,
       flipped: false
@@ -260,15 +307,15 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   function addCurve(): void {
     selectedPieceType.value = 'curve';
     
-    // Calculate current mouse position on grid
+    // Use current mouse position without grid snapping
     const gridSize = getGridSize();
     const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
-    const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
-    const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    const mouseX = (lastMouseX.value - canvasCenterX) / gridSize;
+    const mouseY = (lastMouseY.value - canvasCenterY) / gridSize;
     
     ghostPiece.value = { 
-      x: snappedX, 
-      y: snappedY, 
+      x: mouseX, 
+      y: mouseY, 
       type: 'curve', 
       rotation: 0,
       flipped: false
@@ -381,10 +428,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
     if (draggingPiece.value && !isDeleteMode.value) {
       const [px, py] = toCanvasCoords(0, 0);
-      const snapX = Math.round((mouseX - px) / gridSize - offsetX);
-      const snapY = Math.round((mouseY - py) / gridSize - offsetY);
-      draggingPiece.value.x = Math.round(snapX);
-      draggingPiece.value.y = Math.round(snapY);
+      // Remove grid snapping for dragged pieces - use exact mouse coordinates
+      const exactX = (mouseX - px) / gridSize - offsetX;
+      const exactY = (mouseY - py) / gridSize - offsetY;
+      draggingPiece.value.x = exactX;
+      draggingPiece.value.y = exactY;
       redraw();
     } else if (isPanning.value) {
       offsetPanX.value += mouseX - panStartX.value;
@@ -480,29 +528,40 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleKeyDown(e: KeyboardEvent): void {
-    // Track shift key state
-    isShiftPressed.value = e.shiftKey;
+    // Handle view controls (zoom reset, undo)
+    if (handleViewControls(e)) return;
     
-    // Handle rotation for dragged pieces
+    // Handle piece placement (S, C, D keys)
+    if (handlePiecePlacement(e)) return;
+    
+    // Handle piece rotation
+    if (handleGhostPieceRotation(e)) return;
     if (handleDraggedPieceRotation(e)) return;
     
-    // Handle flip for dragged pieces
+    // Handle piece flipping
+    if (handleGhostPieceFlip(e)) return;
     if (handleDraggedPieceFlip(e)) return;
     
     // Handle escape key for dragged pieces
     if (handleDraggedPieceEscape(e)) return;
     
-    // Handle rotation for ghost pieces
-    if (handleGhostPieceRotation(e)) return;
+    // Handle clear selection
+    if (e.key === 'Escape') {
+      clearSelection();
+      return;
+    }
     
-    // Handle flip for ghost pieces
-    if (handleGhostPieceFlip(e)) return;
+    // Handle debug connection points toggle
+    if (e.key === 'q' || e.key === 'Q') {
+      showConnectionPoints.value = !showConnectionPoints.value;
+      redraw();
+      return;
+    }
     
-    // Handle piece placement shortcuts
-    if (handlePiecePlacement(e)) return;
-    
-    // Handle view controls (zoom reset and undo)
-    handleViewControls(e);
+    // Handle shift key for disabling snapping
+    if (e.key === 'Shift') {
+      isShiftPressed.value = true;
+    }
   }
 
   function handleDraggedPieceRotation(e: KeyboardEvent): boolean {
@@ -562,8 +621,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   function handlePiecePlacement(e: KeyboardEvent): boolean {
     const pieceTypeMap: Record<string, TrackPieceType> = {
       's': 'straight',
+      'S': 'straight',
       'c': 'curve',
+      'C': 'curve',
       'd': null, // Delete mode
+      'D': null, // Delete mode
       'Escape': null
     };
     
@@ -573,24 +635,24 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
     
     // Handle delete mode
-    if (e.key === 'd') {
+    if (e.key === 'd' || e.key === 'D') {
       enableDeleteMode();
       return true;
     }
     
-    // Calculate current mouse position on grid
+    // Use current mouse position without grid snapping
     const gridSize = getGridSize();
     const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
-    const snappedX = Math.round((lastMouseX.value - canvasCenterX) / gridSize);
-    const snappedY = Math.round((lastMouseY.value - canvasCenterY) / gridSize);
+    const mouseX = (lastMouseX.value - canvasCenterX) / gridSize;
+    const mouseY = (lastMouseY.value - canvasCenterY) / gridSize;
     
     // Update selection and ghost piece
     selectedPieceType.value = newPieceType;
     isDeleteMode.value = false;
     hoveredPiece.value = null;
     ghostPiece.value = {
-      x: snappedX,
-      y: snappedY,
+      x: mouseX,
+      y: mouseY,
       type: newPieceType,
       rotation: 0,
       flipped: false,
@@ -605,7 +667,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     isShiftPressed.value = e.shiftKey;
   }
 
-  function handleViewControls(e: KeyboardEvent): void {
+  function handleViewControls(e: KeyboardEvent): boolean {
     const isMac = navigator.userAgent.toLowerCase().indexOf('mac') !== -1;
     const isMetaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
     
@@ -616,14 +678,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       offsetPanX.value = 0;
       offsetPanY.value = 0;
       redraw();
-      return;
+      return true;
     }
     
     // Handle undo (Cmd/Ctrl + Z)
     if (isMetaOrCtrl && e.key === 'z') {
       e.preventDefault();
       undoLastAction();
+      return true;
     }
+    
+    return false;
   }
 
   function initCanvas(): void {
@@ -701,13 +766,22 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
         flipped: piece.flipped || false
       }));
       
+      // Validate the loaded layout
+      const validation = validateLayout(pieces.value);
+      if (!validation.isValid) {
+        console.error('⚠️ Loaded layout has validation errors:', validation.errors);
+        copyStatus.value = `Layout loaded with ${validation.errors.length} validation errors - check console`;
+        setTimeout(() => (copyStatus.value = ''), 4000);
+      } else {
+        copyStatus.value = 'Layout loaded and validated!';
+        setTimeout(() => (copyStatus.value = ''), 2000);
+      }
+      
       // Center the view on the loaded layout
       offsetPanX.value = 0;
       offsetPanY.value = 0;
       
       redraw();
-      copyStatus.value = 'Layout loaded!';
-      setTimeout(() => (copyStatus.value = ''), 2000);
       
     } catch (err) {
       console.error('Failed to load layout:', err);
@@ -721,16 +795,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     
     const gridSize = getGridSize();
     const [px, py] = toCanvasCoords(0, 0);
-    const newX = Math.round((mouseX - px) / gridSize);
-    const newY = Math.round((mouseY - py) / gridSize);
+    // Direct mouse position conversion to grid coordinates (no grid snapping)
+    const newX = (mouseX - px) / gridSize;
+    const newY = (mouseY - py) / gridSize;
     
-    // Update the base ghost piece position
+    // Update the base ghost piece position with exact mouse coordinates
     ghostPiece.value.x = newX;
     ghostPiece.value.y = newY;
     
-    // Only try to snap if we're extremely close to a connection point (within 0.25 grid units)
-    // Also check if Shift is held down to disable snapping entirely
-    const snapResult = !isShiftPressed.value ? findSnapPosition(ghostPiece.value, pieces.value, 0.25) : null;
+    // Check for piece-to-piece snapping (independent of grid)
+    // Use a more generous snap distance to make snapping actually work
+    const snapResult = !isShiftPressed.value ? findSnapPosition(ghostPiece.value, pieces.value, 2.0) : null;
     
     if (snapResult) {
       // Create snapped version, preserving user's flip state if snap doesn't require a flip

@@ -30,10 +30,17 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
     // Start point (back end) - relative to piece center
     const startX = piece.x - (length / 2) * cos;
     const startY = piece.y - (length / 2) * sin;
+    
+    // FIXED: Connection angles for straight pieces should be PERPENDICULAR to the piece rotation
+    // - A horizontal straight (0°) has North/South connections (90°/270°)
+    // - A vertical straight (90°) has East/West connections (0°/180°)
+    const perpAngle1 = piece.rotation + Math.PI / 2; // +90° from piece rotation
+    const perpAngle2 = piece.rotation - Math.PI / 2; // -90° from piece rotation
+    
     points.push({
       x: startX,
       y: startY,
-      angle: piece.rotation + Math.PI, // Facing backwards
+      angle: perpAngle1, // Perpendicular direction 1
       type: 'male'
     });
     
@@ -43,7 +50,7 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
     points.push({
       x: endX,
       y: endY,
-      angle: piece.rotation, // Facing forwards
+      angle: perpAngle2, // Perpendicular direction 2 (opposite)
       type: 'female'
     });
     
@@ -51,6 +58,11 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
     // Curve track - must match the visual rendering exactly
     // Visual rendering uses: radius = 320 * zoom, angleSpan = Math.PI / 8 (22.5°)
     // Center offset: -radius in X direction
+    // Angle system clarification:
+    // - 0° = horizontal curve to the right (East)
+    // - 90° = vertical curve pointing up (North)  
+    // - 180° = horizontal curve to the left (West)
+    // - 270° = vertical curve pointing down (South)
     
     const radius = 10; // Grid units (320 pixels / 32 pixels per grid unit)
     const angleSpan = Math.PI / 8; // 22.5 degrees - must match visual
@@ -58,12 +70,20 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
     const curveDirection = isFlipped ? -1 : 1;
     
     // The curve center is offset from the piece position
-    const centerOffsetX = -radius * Math.cos(piece.rotation);
-    const centerOffsetY = -radius * Math.sin(piece.rotation);
-    const centerX = piece.x + centerOffsetX;
-    const centerY = piece.y + centerOffsetY;
+    // FIXED: Match the actual rendering geometry from curveTrack.ts
+    // The curve center is offset by -radius in local X direction, then rotated
+    // This matches: offsetX = -radius; offsetY = 0; in the rendering code
+    const localCenterX = -radius;
+    const localCenterY = 0;
+    
+    // Transform local center to world coordinates using piece rotation
+    const cos = Math.cos(piece.rotation);
+    const sin = Math.sin(piece.rotation);
+    const centerX = piece.x + (localCenterX * cos - localCenterY * sin);
+    const centerY = piece.y + (localCenterX * sin + localCenterY * cos);
     
     // Start point: at the piece position (entry to curve)
+    // The connection angle accounts for the curve's entry direction
     points.push({
       x: piece.x,
       y: piece.y,
@@ -72,14 +92,22 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
     });
     
     // End point: calculate where the curve actually ends
-    const endAngle = angleSpan * curveDirection;
-    const endX = centerX + radius * Math.cos(piece.rotation + endAngle);
-    const endY = centerY + radius * Math.sin(piece.rotation + endAngle);
+    // In local coordinates: startAngle = 0, endAngle = angleSpan * curveDirection
+    const localEndAngle = angleSpan * curveDirection;
+    const localEndX = radius * Math.cos(localEndAngle);
+    const localEndY = radius * Math.sin(localEndAngle) * (isFlipped ? -1 : 1);
+    
+    // Transform local end point to world coordinates
+    const endX = centerX + (localEndX * cos - localEndY * sin);
+    const endY = centerY + (localEndX * sin + localEndY * cos);
+    
+    // The connection angle at the end should be tangent to the curve
+    const endAngleDirection = piece.rotation + localEndAngle;
     
     points.push({
       x: endX,
       y: endY,
-      angle: piece.rotation + endAngle, // Facing outward at final angle
+      angle: endAngleDirection, // Facing outward at final angle
       type: 'female'
     });
   }
@@ -88,20 +116,390 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
 }
 
 /**
- * Check if two connection points can connect
+ * Check if two connection points can connect with potential rotation
+ */
+export function canConnectWithRotation(
+  piece1: TrackPiece,
+  piece2: TrackPiece,
+  point1: ConnectionPoint,
+  point2: ConnectionPoint
+): { canConnect: boolean; rotationNeeded: number } {
+  const distance = Math.sqrt(
+    Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2)
+  );
+  
+  // Points must be extremely close (within 0.3 grid units)
+  if (distance > 0.3) {
+    return { canConnect: false, rotationNeeded: 0 };
+  }
+  
+  // Check piece-specific connection rules first
+  if (piece1.type === 'straight' && piece2.type === 'straight') {
+    // Straight to straight: must be opposite types (male→female)
+    if (point1.type === point2.type) {
+      return { canConnect: false, rotationNeeded: 0 };
+    }
+  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+    // Curve to curve: must be opposite types (male→female)
+    if (point1.type === point2.type) {
+      return { canConnect: false, rotationNeeded: 0 };
+    }
+  }
+  // For straight-curve connections, allow any type combination
+  
+  // Calculate required rotation to align angles
+  const targetAngle = point2.angle + Math.PI; // Opposite direction
+  const currentAngle = point1.angle;
+  let rotationDelta = targetAngle - currentAngle;
+  
+  // Normalize to shortest path
+  while (rotationDelta > Math.PI) rotationDelta -= 2 * Math.PI;
+  while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
+  
+  // Snap to valid rotation increments
+  const rotationStep = piece1.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+  const snappedRotation = Math.round(rotationDelta / rotationStep) * rotationStep;
+  
+  // Check if the snapped rotation creates a valid alignment
+  const finalAngle = currentAngle + snappedRotation;
+  const angleDiff = Math.abs(finalAngle - targetAngle);
+  const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+  
+  if (normalizedAngleDiff < Math.PI / 24) { // 7.5 degrees tolerance
+    console.log('✅ Connection possible with rotation:', {
+      distance: distance.toFixed(3),
+      rotationNeeded: (snappedRotation * 180 / Math.PI).toFixed(1) + '°',
+      finalAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+      types: point1.type + ' ↔ ' + point2.type
+    });
+    return { canConnect: true, rotationNeeded: snappedRotation };
+  }
+  
+  console.log('❌ Cannot create valid connection:', {
+    distance: distance.toFixed(3),
+    rotationNeeded: (snappedRotation * 180 / Math.PI).toFixed(1) + '°',
+    finalAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+    maxAllowed: '7.5°'
+  });
+  
+  return { canConnect: false, rotationNeeded: 0 };
+}
+
+/**
+ * Check if two connection points can connect (legacy - for backwards compatibility)
  */
 export function canConnect(point1: ConnectionPoint, point2: ConnectionPoint): boolean {
   const distance = Math.sqrt(
     Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2)
   );
   
-  // Points must be very close (within 0.3 grid units for precise snapping)
-  if (distance > 0.3) return false;
+  // Points must be extremely close (within 0.3 grid units)
+  if (distance > 0.3) {
+    return false;
+  }
   
-  // Angles must be opposite (within 30 degrees tolerance)
+  // Angles must be opposite (within 7.5 degrees tolerance for very precise connections)
   const angleDiff = Math.abs(point1.angle - point2.angle - Math.PI);
   const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
-  if (normalizedAngleDiff > Math.PI / 6) return false; // 30 degrees tolerance
+  
+  return normalizedAngleDiff <= Math.PI / 24; // 7.5 degrees tolerance
+}
+
+/**
+ * Validate that a connection creates logical track flow
+ */
+export function validateTrackFlow(
+  piece1: TrackPiece, 
+  piece2: TrackPiece, 
+  connectionPoint1: ConnectionPoint, 
+  connectionPoint2: ConnectionPoint
+): boolean {
+  // Check if the connection creates a smooth track transition
+  if (piece1.type === 'straight' && piece2.type === 'curve') {
+    return validateStraightToCurve(piece1, piece2, connectionPoint1, connectionPoint2);
+  } else if (piece1.type === 'curve' && piece2.type === 'straight') {
+    return validateCurveToStraight(piece1, piece2, connectionPoint1, connectionPoint2);
+  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+    return validateCurveToCurve(piece1, piece2, connectionPoint1, connectionPoint2);
+  } else if (piece1.type === 'straight' && piece2.type === 'straight') {
+    // Straight to straight connections: must be aligned
+    const angleDiff = Math.abs(piece1.rotation - piece2.rotation);
+    const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+    
+    // Must be parallel (0°) or opposite (180°), with small tolerance
+    const isParallel = normalizedAngleDiff < Math.PI / 12; // 15 degrees
+    const isOpposite = Math.abs(normalizedAngleDiff - Math.PI) < Math.PI / 12; // 15 degrees from 180°
+    
+    if (!isParallel && !isOpposite) {
+      console.log('❌ Straight pieces not aligned:', {
+        piece1Rotation: (piece1.rotation * 180 / Math.PI).toFixed(1) + '°',
+        piece2Rotation: (piece2.rotation * 180 / Math.PI).toFixed(1) + '°',
+        angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
+      });
+      return false;
+    }
+    
+    return true;
+  }
+  
+  return true;
+}
+
+/**
+ * Validate straight to curve connection
+ */
+function validateStraightToCurve(
+  straightPiece: TrackPiece,
+  curvePiece: TrackPiece,
+  straightConnection: ConnectionPoint,
+  curveConnection: ConnectionPoint
+): boolean {
+  // For a valid straight-to-curve connection, we need to validate that:
+  // 1. The connection point angles are properly opposite
+  // 2. The piece orientations make geometric sense
+  
+  const straightConnAngle = straightConnection.angle;
+  const curveConnAngle = curveConnection.angle;
+  
+  // Connection angles should be opposite (within tolerance)
+  const expectedAngleDiff = Math.PI; // 180 degrees
+  const actualAngleDiff = Math.abs(straightConnAngle - curveConnAngle);
+  const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
+  
+  if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
+    console.log('❌ Straight-to-curve connection angles not opposite:', {
+      straightPiece: `rotation ${(straightPiece.rotation * 180 / Math.PI).toFixed(1)}°`,
+      curvePiece: `rotation ${(curvePiece.rotation * 180 / Math.PI).toFixed(1)}°`,
+      straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
+      curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
+      connAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+      expected: '180°'
+    });
+    return false;
+  }
+  
+  // Additional validation: check if the piece orientations are geometrically compatible
+  // Compass-based angle system:
+  // - 0° = East (horizontal right)
+  // - 90° = North (vertical up)  
+  // - 180° = West (horizontal left)
+  // - 270° = South (vertical down)
+  const straightRotation = straightPiece.rotation;
+  const curveRotation = curvePiece.rotation;
+  
+  // Normalize rotations to 0-2π range
+  const normalizedStraightRot = ((straightRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const normalizedCurveRot = ((curveRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  
+  // Convert to degrees for easier understanding
+  const straightDegrees = normalizedStraightRot * 180 / Math.PI;
+  const curveDegrees = normalizedCurveRot * 180 / Math.PI;
+  
+  // Enhanced validation: Check for impossible straight-to-curve connections
+  // Based on the actual connection point angles, not piece rotations
+  
+  // Get the connection angles (normalized to 0-2π)
+  const straightConnAngleNorm = ((straightConnAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const curveConnAngleNorm = ((curveConnAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  
+  // Convert to degrees for easier understanding  
+  const straightConnDegrees = straightConnAngleNorm * 180 / Math.PI;
+  const curveConnDegrees = curveConnAngleNorm * 180 / Math.PI;
+  
+  // Define connection point orientations with tolerance
+  const connPointTolerance = 30; // 30° tolerance for connection point directions
+  
+  const isStraightNorthSouth = Math.abs(straightConnDegrees - 90) < connPointTolerance || Math.abs(straightConnDegrees - 270) < connPointTolerance;
+  const isStraightEastWest = Math.abs(straightConnDegrees) < connPointTolerance || Math.abs(straightConnDegrees - 180) < connPointTolerance;
+  const isCurveNorthSouth = Math.abs(curveConnDegrees - 90) < connPointTolerance || Math.abs(curveConnDegrees - 270) < connPointTolerance;
+  const isCurveEastWest = Math.abs(curveConnDegrees) < connPointTolerance || Math.abs(curveConnDegrees - 180) < connPointTolerance;
+  
+  // Check for impossible combinations based on connection point directions
+  if (isStraightNorthSouth && isCurveEastWest) {
+    console.log('❌ Impossible connection: Straight North-South connections cannot connect to curve East-West connections:', {
+      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
+      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
+      issue: 'Connection point directions are perpendicular',
+      explanation: 'Straight has North-South connection points, curve has East-West connection points'
+    });
+    return false;
+  }
+  
+  if (isStraightEastWest && isCurveNorthSouth) {
+    console.log('❌ Impossible connection: Straight East-West connections cannot connect to curve North-South connections:', {
+      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
+      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
+      issue: 'Connection point directions are perpendicular',
+      explanation: 'Straight has East-West connection points, curve has North-South connection points'
+    });
+    return false;
+  }
+  
+  // Check if the orientations are compatible
+  const rotationDiff = Math.abs(normalizedStraightRot - normalizedCurveRot);
+  const normalizedRotDiff = Math.min(rotationDiff, 2 * Math.PI - rotationDiff);
+  
+  // Allow some tolerance for different valid orientations
+  const validOrientations = [
+    0, // Same orientation
+    Math.PI / 4, // 45° difference
+    Math.PI / 2, // 90° difference
+    3 * Math.PI / 4, // 135° difference
+    Math.PI, // 180° difference
+    5 * Math.PI / 4, // 225° difference
+    3 * Math.PI / 2, // 270° difference
+    7 * Math.PI / 4  // 315° difference
+  ];
+  
+  const tolerance = Math.PI / 8; // 22.5° tolerance
+  const isValidOrientation = validOrientations.some(validAngle => 
+    Math.abs(normalizedRotDiff - validAngle) < tolerance
+  );
+  
+  if (!isValidOrientation) {
+    console.log('❌ Straight-to-curve piece orientations incompatible:', {
+      straightRotation: (normalizedStraightRot * 180 / Math.PI).toFixed(1) + '°',
+      curveRotation: (normalizedCurveRot * 180 / Math.PI).toFixed(1) + '°',
+      rotationDiff: (normalizedRotDiff * 180 / Math.PI).toFixed(1) + '°',
+      note: 'Pieces must be oriented to allow smooth track connections'
+    });
+    return false;
+  }
+  
+  console.log('✅ Straight-to-curve connection valid:', {
+    straightRotation: (normalizedStraightRot * 180 / Math.PI).toFixed(1) + '°',
+    curveRotation: (normalizedCurveRot * 180 / Math.PI).toFixed(1) + '°',
+    straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
+    curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
+    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
+  });
+  
+  return true;
+}
+
+/**
+ * Validate curve to straight connection
+ */
+function validateCurveToStraight(
+  curvePiece: TrackPiece,
+  straightPiece: TrackPiece,
+  curveConnection: ConnectionPoint,
+  straightConnection: ConnectionPoint
+): boolean {
+  // For a valid curve-to-straight connection, we need to validate that:
+  // 1. The connection point angles are properly opposite
+  // 2. The piece orientations make geometric sense
+  
+  const curveConnAngle = curveConnection.angle;
+  const straightConnAngle = straightConnection.angle;
+  
+  // Connection angles should be opposite (within tolerance)
+  const expectedAngleDiff = Math.PI; // 180 degrees
+  const actualAngleDiff = Math.abs(curveConnAngle - straightConnAngle);
+  const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
+  
+  if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
+    console.log('❌ Curve-to-straight connection angles not opposite:', {
+      curvePiece: `rotation ${(curvePiece.rotation * 180 / Math.PI).toFixed(1)}°`,
+      straightPiece: `rotation ${(straightPiece.rotation * 180 / Math.PI).toFixed(1)}°`,
+      curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
+      straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
+      connAngleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+      expected: '180°'
+    });
+    return false;
+  }
+  
+  // Additional validation: check if the piece orientations are geometrically compatible
+  const curveRotation = curvePiece.rotation;
+  const straightRotation = straightPiece.rotation;
+  
+  // Normalize rotations to 0-2π range
+  const normalizedCurveRot = ((curveRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const normalizedStraightRot = ((straightRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  
+  // Enhanced validation: Check for impossible curve-to-straight connections
+  // Based on the actual connection point angles, not piece rotations
+  
+  // Get the connection angles (normalized to 0-2π)
+  const curveConnAngleNorm = ((curveConnAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const straightConnAngleNorm = ((straightConnAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  
+  // Convert to degrees for easier understanding
+  const curveConnDegrees = curveConnAngleNorm * 180 / Math.PI;
+  const straightConnDegrees = straightConnAngleNorm * 180 / Math.PI;
+  
+  // Define connection point orientations with tolerance
+  const connPointTolerance = 30; // 30° tolerance for connection point directions
+  
+  const isCurveNorthSouth = Math.abs(curveConnDegrees - 90) < connPointTolerance || Math.abs(curveConnDegrees - 270) < connPointTolerance;
+  const isCurveEastWest = Math.abs(curveConnDegrees) < connPointTolerance || Math.abs(curveConnDegrees - 180) < connPointTolerance;
+  const isStraightNorthSouth = Math.abs(straightConnDegrees - 90) < connPointTolerance || Math.abs(straightConnDegrees - 270) < connPointTolerance;
+  const isStraightEastWest = Math.abs(straightConnDegrees) < connPointTolerance || Math.abs(straightConnDegrees - 180) < connPointTolerance;
+  
+  // Check for impossible combinations based on connection point directions
+  if (isCurveEastWest && isStraightNorthSouth) {
+    console.log('❌ Impossible connection: Curve East-West connections cannot connect to straight North-South connections:', {
+      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
+      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
+      issue: 'Connection point directions are perpendicular',
+      explanation: 'Curve has East-West connection points, straight has North-South connection points'
+    });
+    return false;
+  }
+  
+  if (isCurveNorthSouth && isStraightEastWest) {
+    console.log('❌ Impossible connection: Curve North-South connections cannot connect to straight East-West connections:', {
+      curveConnAngle: curveConnDegrees.toFixed(1) + '°',
+      straightConnAngle: straightConnDegrees.toFixed(1) + '°',
+      issue: 'Connection point directions are perpendicular',
+      explanation: 'Curve has North-South connection points, straight has East-West connection points'
+    });
+    return false;
+  }
+  
+  console.log('✅ Curve-to-straight connection valid:', {
+    curveConnAngle: (curveConnAngle * 180 / Math.PI).toFixed(1) + '°',
+    straightConnAngle: (straightConnAngle * 180 / Math.PI).toFixed(1) + '°',
+    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
+  });
+  
+  return true;
+}
+
+/**
+ * Validate curve to curve connection
+ */
+function validateCurveToCurve(
+  curve1: TrackPiece,
+  curve2: TrackPiece,
+  connection1: ConnectionPoint,
+  connection2: ConnectionPoint
+): boolean {
+  // For curve-to-curve connections, the connection points must have opposite angles
+  const angle1 = connection1.angle;
+  const angle2 = connection2.angle;
+  
+  // They should be opposite directions (within tolerance)
+  const expectedAngleDiff = Math.PI; // 180 degrees
+  const actualAngleDiff = Math.abs(angle1 - angle2);
+  const normalizedAngleDiff = Math.min(actualAngleDiff, 2 * Math.PI - actualAngleDiff);
+  
+  if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
+    console.log('❌ Curve-to-curve angle mismatch:', {
+      curve1Angle: (angle1 * 180 / Math.PI).toFixed(1) + '°',
+      curve2Angle: (angle2 * 180 / Math.PI).toFixed(1) + '°',
+      angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+      expected: '180°'
+    });
+    return false;
+  }
+  
+  console.log('✅ Curve-to-curve connection valid:', {
+    curve1Angle: (angle1 * 180 / Math.PI).toFixed(1) + '°',
+    curve2Angle: (angle2 * 180 / Math.PI).toFixed(1) + '°',
+    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
+  });
   
   return true;
 }
@@ -112,99 +510,116 @@ export function canConnect(point1: ConnectionPoint, point2: ConnectionPoint): bo
 export function findSnapPosition(
   newPiece: TrackPiece,
   existingPieces: TrackPiece[],
-  snapDistance: number = 0.8
+  snapDistance: number = 2.0 // More generous snap distance for better usability
 ): SnapResult | null {
+  if (existingPieces.length === 0) return null;
+  
   let bestSnap: SnapResult | null = null;
   let bestDistance = Infinity;
   
-  // Prioritize the user's current settings, but also try alternatives
+  // Try both regular and flipped versions
   const piecesToTry = [
-    // First try with user's current settings (highest priority)
     { ...newPiece },
-    // Then try with flipped version (lower priority)
     { ...newPiece, flipped: !newPiece.flipped }
   ];
   
-  for (let pieceIndex = 0; pieceIndex < piecesToTry.length; pieceIndex++) {
-    const pieceVariant = piecesToTry[pieceIndex];
-    const newConnections = getConnectionPoints(pieceVariant);
+  for (const pieceVariant of piecesToTry) {
+    // Try different rotations to see if any create valid connections
+    const rotationSteps = pieceVariant.type === 'curve' ? 16 : 4; // 22.5° for curves, 90° for straights
+    const rotationIncrement = (2 * Math.PI) / rotationSteps;
     
-    for (const existingPiece of existingPieces) {
-      const existingConnections = getConnectionPoints(existingPiece);
+    for (let rotStep = 0; rotStep < rotationSteps; rotStep++) {
+      const testRotation = pieceVariant.rotation + (rotStep * rotationIncrement);
+      const testPiece = { ...pieceVariant, rotation: testRotation };
+      const newConnections = getConnectionPoints(testPiece);
       
-      for (const newConn of newConnections) {
-        for (const existingConn of existingConnections) {
-          const distance = Math.sqrt(
-            Math.pow(newConn.x - existingConn.x, 2) + 
-            Math.pow(newConn.y - existingConn.y, 2)
-          );
-          
-          if (distance <= snapDistance) {
-            // Calculate the position adjustment needed
-            const deltaX = existingConn.x - newConn.x;
-            const deltaY = existingConn.y - newConn.y;
+      for (const existingPiece of existingPieces) {
+        const existingConnections = getConnectionPoints(existingPiece);
+        
+        for (const newConn of newConnections) {
+          for (const existingConn of existingConnections) {
+            const distance = Math.sqrt(
+              Math.pow(newConn.x - existingConn.x, 2) + 
+              Math.pow(newConn.y - existingConn.y, 2)
+            );
             
-            // Calculate the rotation adjustment needed for proper alignment
-            const targetAngle = existingConn.angle + Math.PI; // Opposite direction
-            const currentAngle = newConn.angle;
-            let rotationDelta = targetAngle - currentAngle;
+            // First check: connection points must be very close
+            if (distance > snapDistance) continue;
             
-            // Normalize rotation delta to the shortest path
-            while (rotationDelta > Math.PI) rotationDelta -= 2 * Math.PI;
-            while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
-            
-            // Snap to nearest valid rotation increment
-            if (newPiece.type === 'curve') {
-              const rotationStep = Math.PI / 8; // 22.5 degrees for curves
-              rotationDelta = Math.round(rotationDelta / rotationStep) * rotationStep;
-            } else {
-              const rotationStep = Math.PI / 2; // 90 degrees for straight tracks
-              rotationDelta = Math.round(rotationDelta / rotationStep) * rotationStep;
+            // Second check: validate piece-specific connection rules
+            if (!isValidConnectionTypes(testPiece, existingPiece, newConn, existingConn)) {
+              continue;
             }
             
-            // Check if the connection would be valid after adjustment
-            const finalAngle = currentAngle + rotationDelta;
-            const angleDiff = Math.abs(finalAngle - targetAngle);
+            // Third check: angles must be compatible (opposite directions)
+            const angleDiff = Math.abs(newConn.angle - existingConn.angle - Math.PI);
             const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+            if (normalizedAngleDiff > Math.PI / 12) continue; // More generous: 15° tolerance instead of 7.5°
             
-            // Accept connections that align reasonably well (within 45 degrees for better curve support)
-            if (normalizedAngleDiff < Math.PI / 4) {
-              // Create the adjusted piece to validate all connections
-              const adjustedPiece = {
-                ...pieceVariant,
-                x: newPiece.x + deltaX,
-                y: newPiece.y + deltaY,
-                rotation: newPiece.rotation + rotationDelta
-              };
+            // Calculate position adjustment to snap connection points together
+            const deltaX = existingConn.x - newConn.x;
+            const deltaY = existingConn.y - newConn.y;
+            const adjustmentDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Skip if adjustment is too large (pieces are too far apart)
+            if (adjustmentDistance > 0.5) { // More generous: 0.5 instead of 0.15
+              console.log('❌ Position adjustment too large:', {
+                adjustment: adjustmentDistance.toFixed(4),
+                maxAllowed: '0.5',
+                deltaX: deltaX.toFixed(4),
+                deltaY: deltaY.toFixed(4),
+                piece1Pos: `(${testPiece.x}, ${testPiece.y})`,
+                piece2Pos: `(${existingPiece.x}, ${existingPiece.y})`
+              });
+              continue;
+            }
+            
+            // Create the snapped piece
+            const snappedPiece = {
+              ...testPiece,
+              x: newPiece.x + deltaX,
+              y: newPiece.y + deltaY
+            };
+            
+            // Final validation: ensure the snapped piece creates valid track flow
+            // More permissive validation to allow snapping to work
+            if (validateTrackFlow(snappedPiece, existingPiece, newConn, existingConn) &&
+                !wouldOverlap(snappedPiece, existingPiece) &&
+                isReasonableConnection(snappedPiece, existingPiece, deltaX, deltaY)) {
               
-              // Validate that this placement makes sense by checking all connection points
-              if (isValidPlacement(adjustedPiece, existingPieces, snapDistance)) {
-                // Calculate a preference score based on user's current settings
-                let preferenceScore = 0;
+              if (distance < bestDistance) {
+                console.log('🎯 Valid snap found:', {
+                  newPiece: testPiece.type,
+                  existingPiece: existingPiece.type,
+                  distance: distance.toFixed(3),
+                  rotationUsed: (testRotation * 180 / Math.PI).toFixed(1) + '°',
+                  angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+                  connectionTypes: newConn.type + ' ↔ ' + existingConn.type,
+                  positionAdjustment: `(${deltaX.toFixed(2)}, ${deltaY.toFixed(2)})`,
+                  flipped: testPiece.flipped
+                });
                 
-                // Prioritize user's original settings over flipped alternatives
-                if (pieceIndex > 0) {
-                  preferenceScore += 1000; // Heavy penalty for flipped version
-                }
-                
-                // Add penalty for large rotation changes (encourage smaller adjustments)
-                const rotationPenalty = Math.abs(rotationDelta) * 100;
-                preferenceScore += rotationPenalty;
-                
-                const adjustedDistance = distance + preferenceScore;
-                
-                if (adjustedDistance < bestDistance) {
-                  bestSnap = {
-                    position: {
-                      x: adjustedPiece.x,
-                      y: adjustedPiece.y
-                    },
-                    rotation: adjustedPiece.rotation,
-                    flipped: pieceVariant.flipped
-                  };
-                  bestDistance = adjustedDistance;
-                }
+                bestSnap = {
+                  position: {
+                    x: snappedPiece.x,
+                    y: snappedPiece.y
+                  },
+                  rotation: testRotation,
+                  flipped: testPiece.flipped
+                };
+                bestDistance = distance;
               }
+            } else {
+              // Simpler logging for debugging why snaps are rejected
+              console.log('❌ Failed final validation:', {
+                distance: distance.toFixed(3),
+                rotation: (testRotation * 180 / Math.PI).toFixed(1) + '°',
+                angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+                positionAdjustment: `(${deltaX.toFixed(2)}, ${deltaY.toFixed(2)})`,
+                trackFlowValid: validateTrackFlow(snappedPiece, existingPiece, newConn, existingConn),
+                overlapCheck: !wouldOverlap(snappedPiece, existingPiece),
+                reasonableConnection: isReasonableConnection(snappedPiece, existingPiece, deltaX, deltaY)
+              });
             }
           }
         }
@@ -216,6 +631,27 @@ export function findSnapPosition(
 }
 
 /**
+ * Validate piece-specific connection type rules
+ */
+function isValidConnectionTypes(
+  piece1: TrackPiece,
+  piece2: TrackPiece,
+  point1: ConnectionPoint,
+  point2: ConnectionPoint
+): boolean {
+  // Check piece-specific connection rules
+  if (piece1.type === 'straight' && piece2.type === 'straight') {
+    // Straight to straight: must be opposite types (male→female)
+    return point1.type !== point2.type;
+  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+    // Curve to curve: must be opposite types (male→female)
+    return point1.type !== point2.type;
+  }
+  // For straight-curve connections, allow any type combination
+  return true;
+}
+
+/**
  * Validate that a piece placement makes logical sense by checking connection requirements
  */
 function isValidPlacement(
@@ -223,64 +659,386 @@ function isValidPlacement(
   existingPieces: TrackPiece[],
   snapDistance: number
 ): boolean {
-  // First, check for collisions with existing pieces
-  for (const existingPiece of existingPieces) {
-    const distance = Math.sqrt(
-      Math.pow(newPiece.x - existingPiece.x, 2) + 
-      Math.pow(newPiece.y - existingPiece.y, 2)
+  // For now, allow all placements to restore basic snapping
+  // TODO: Re-implement smarter validation later
+  return true;
+}
+
+/**
+ * Validate that a specific connection between two pieces is geometrically valid
+ */
+function isValidConnection(
+  newPiece: TrackPiece,
+  existingPiece: TrackPiece,
+  connectionPoint: ConnectionPoint
+): boolean {
+  // Check if the connection creates a valid track flow
+  if (newPiece.type === 'straight' && existingPiece.type === 'straight') {
+    // Straight to straight: must be perfectly aligned (parallel or 180° opposite)
+    const angleDiff = Math.abs(newPiece.rotation - existingPiece.rotation);
+    const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+    
+    // Must be parallel (0°) or opposite (180°), with very tight tolerance
+    const isParallel = normalizedAngleDiff < Math.PI / 24; // 7.5 degrees
+    const isOpposite = Math.abs(normalizedAngleDiff - Math.PI) < Math.PI / 24; // 7.5 degrees from 180°
+    
+    if (!isParallel && !isOpposite) {
+      console.log('❌ Straight pieces not properly aligned:', {
+        piece1Rotation: (newPiece.rotation * 180 / Math.PI).toFixed(1) + '°',
+        piece2Rotation: (existingPiece.rotation * 180 / Math.PI).toFixed(1) + '°',
+        angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+        requirement: 'Must be parallel (0°) or opposite (180°) ±7.5°'
+      });
+      return false;
+    }
+    
+    return true;
+  }
+  
+  if (newPiece.type === 'curve' && existingPiece.type === 'curve') {
+    // Curve to curve: connection points must align properly
+    // This is handled by canConnect, but we can add extra validation here
+    return true;
+  }
+  
+  if ((newPiece.type === 'straight' && existingPiece.type === 'curve') ||
+      (newPiece.type === 'curve' && existingPiece.type === 'straight')) {
+    // Straight to curve: allow more flexible connections
+    // The angle matching in canConnect ensures they're properly aligned
+    console.log('✅ Straight-curve connection geometry valid');
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if two pieces would physically overlap in an invalid way
+ */
+function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
+  // Calculate the distance between piece centers
+  const centerDistance = Math.sqrt(
+    Math.pow(piece1.x - piece2.x, 2) + Math.pow(piece1.y - piece2.y, 2)
+  );
+  
+  // Define minimum safe distances based on piece types
+  let minDistance = 0;
+  
+  if (piece1.type === 'straight' && piece2.type === 'straight') {
+    // Straight pieces: minimum distance should be close to their length (4 grid units)
+    // But allow for end-to-end connections
+    minDistance = 3.5; // Allow some tolerance for valid connections
+  } else if (piece1.type === 'curve' || piece2.type === 'curve') {
+    // Curves need more space due to their radius
+    minDistance = 1.5; // More permissive for curve connections
+  }
+  
+  // If pieces are too close (but not connecting), they're likely overlapping
+  if (centerDistance < minDistance) {
+    // But allow if they're actually making a valid connection
+    const connections1 = getConnectionPoints(piece1);
+    const connections2 = getConnectionPoints(piece2);
+    
+    // Check if any connection points are very close (valid connection)
+    for (const conn1 of connections1) {
+      for (const conn2 of connections2) {
+        const connDistance = Math.sqrt(
+          Math.pow(conn1.x - conn2.x, 2) + Math.pow(conn1.y - conn2.y, 2)
+        );
+        if (connDistance < 0.1) {
+          // Valid connection found, not an overlap
+          return false;
+        }
+      }
+    }
+    
+    console.log('⚠️ Potential overlap detected:', {
+      piece1: piece1.type,
+      piece2: piece2.type,
+      centerDistance: centerDistance.toFixed(3),
+      minDistance: minDistance
+    });
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if a connection has valid geometric properties
+ */
+function hasValidGeometry(
+  piece1: TrackPiece,
+  piece2: TrackPiece,
+  connection1: ConnectionPoint,
+  connection2: ConnectionPoint
+): boolean {
+  // Check 1: Connection points must be extremely close (stricter than before)
+  const connDistance = Math.sqrt(
+    Math.pow(connection1.x - connection2.x, 2) + 
+    Math.pow(connection1.y - connection2.y, 2)
+  );
+  
+  if (connDistance > 0.05) { // Much stricter: 0.05 instead of 0.1
+    console.log('❌ Connection points too far apart:', {
+      distance: connDistance.toFixed(4),
+      maxAllowed: '0.05',
+      point1: `(${connection1.x.toFixed(2)}, ${connection1.y.toFixed(2)})`,
+      point2: `(${connection2.x.toFixed(2)}, ${connection2.y.toFixed(2)})`
+    });
+    return false;
+  }
+  
+  // Check 2: Validate piece center distances and orientations
+  const pieceDistance = Math.sqrt(
+    Math.pow(piece1.x - piece2.x, 2) + 
+    Math.pow(piece1.y - piece2.y, 2)
+  );
+  
+  // Special validation for straight-to-any connections
+  if (piece1.type === 'straight' || piece2.type === 'straight') {
+    // For straight pieces, we need to verify the connection geometry more carefully
+    const straightPiece = piece1.type === 'straight' ? piece1 : piece2;
+    const otherPiece = piece1.type === 'straight' ? piece2 : piece1;
+    const straightConn = piece1.type === 'straight' ? connection1 : connection2;
+    const otherConn = piece1.type === 'straight' ? connection2 : connection1;
+    
+    // The connection point should be at one end of the straight piece
+    const straightLength = 4; // Grid units
+    const distanceFromStraightCenter = Math.sqrt(
+      Math.pow(straightConn.x - straightPiece.x, 2) + 
+      Math.pow(straightConn.y - straightPiece.y, 2)
     );
     
-    // If pieces are too close (but not connecting), it's a collision
-    if (distance < 0.5) {
-      // Check if they're actually trying to connect
-      const newConnections = getConnectionPoints(newPiece);
-      const existingConnections = getConnectionPoints(existingPiece);
-      
-      let hasValidConnection = false;
-      for (const newConn of newConnections) {
-        for (const existingConn of existingConnections) {
-          if (canConnect(newConn, existingConn)) {
-            hasValidConnection = true;
-            break;
-          }
-        }
-        if (hasValidConnection) break;
-      }
-      
-      // If no valid connection but pieces are close, it's a collision
-      if (!hasValidConnection) {
+    // Connection point should be at the end of the straight piece (2 grid units from center)
+    if (Math.abs(distanceFromStraightCenter - straightLength/2) > 0.1) {
+      console.log('❌ Straight piece connection not at end:', {
+        straightPiece: `(${straightPiece.x}, ${straightPiece.y})`,
+        connectionPoint: `(${straightConn.x.toFixed(2)}, ${straightConn.y.toFixed(2)})`,
+        distanceFromCenter: distanceFromStraightCenter.toFixed(3),
+        expected: (straightLength/2).toFixed(1)
+      });
+      return false;
+    }
+    
+    // Additional check: if connecting straight to straight, pieces should be ~4 units apart
+    if (otherPiece.type === 'straight') {
+      if (Math.abs(pieceDistance - 4) > 0.2) {
+        console.log('❌ Straight pieces invalid distance:', {
+          piece1Pos: `(${piece1.x}, ${piece1.y})`,
+          piece2Pos: `(${piece2.x}, ${piece2.y})`,
+          distance: pieceDistance.toFixed(3),
+          expected: '4.0 ± 0.2'
+        });
         return false;
       }
     }
   }
   
-  const newConnections = getConnectionPoints(newPiece);
-  const allExistingConnections: ConnectionPoint[] = [];
+  // Check 3: Connection angles must be properly opposite
+  const angle1 = connection1.angle;
+  const angle2 = connection2.angle;
+  const angleDiff = Math.abs(angle1 - angle2);
+  const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+  const expectedAngleDiff = Math.PI; // 180 degrees
   
-  // Collect all existing connection points
-  for (const existingPiece of existingPieces) {
-    allExistingConnections.push(...getConnectionPoints(existingPiece));
+  if (Math.abs(normalizedAngleDiff - expectedAngleDiff) > Math.PI / 24) {
+    console.log('❌ Connection angles not properly opposite:', {
+      angle1: (angle1 * 180 / Math.PI).toFixed(1) + '°',
+      angle2: (angle2 * 180 / Math.PI).toFixed(1) + '°',
+      angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°',
+      expected: '180°'
+    });
+    return false;
   }
   
-  let connectionsFound = 0;
+  console.log('✅ Valid geometry confirmed:', {
+    connDistance: connDistance.toFixed(4),
+    pieceDistance: pieceDistance.toFixed(3),
+    angleDiff: (normalizedAngleDiff * 180 / Math.PI).toFixed(1) + '°'
+  });
   
-  // Check each connection point of the new piece
-  for (const newConn of newConnections) {
-    for (const existingConn of allExistingConnections) {
-      const distance = Math.sqrt(
-        Math.pow(newConn.x - existingConn.x, 2) + 
-        Math.pow(newConn.y - existingConn.y, 2)
-      );
+  return true;
+}
+
+/**
+ * Check if a connection requires a reasonable position adjustment
+ */
+function isReasonableConnection(
+  piece1: TrackPiece, 
+  piece2: TrackPiece, 
+  deltaX: number, 
+  deltaY: number
+): boolean {
+  // Calculate the magnitude of position adjustment needed
+  const adjustmentDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  
+  // Position adjustments should be reasonable for valid snapping
+  const maxAdjustment = 0.5; // More generous: 0.5 instead of 0.15
+  
+  if (adjustmentDistance > maxAdjustment) {
+    console.log('❌ Position adjustment too large in final check:', {
+      adjustment: adjustmentDistance.toFixed(4),
+      maxAllowed: maxAdjustment,
+      deltaX: deltaX.toFixed(4),
+      deltaY: deltaY.toFixed(4),
+      piece1Pos: `(${piece1.x}, ${piece1.y})`,
+      piece2Pos: `(${piece2.x}, ${piece2.y})`
+    });
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Validate an entire layout for geometric consistency
+ */
+export function validateLayout(pieces: TrackPiece[]): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (pieces.length < 2) {
+    return { isValid: true, errors: [] };
+  }
+  
+  // Get all connection points
+  const allConnections: { piece: TrackPiece; connection: ConnectionPoint }[] = [];
+  for (const piece of pieces) {
+    const connections = getConnectionPoints(piece);
+    for (const connection of connections) {
+      allConnections.push({ piece, connection });
+    }
+  }
+  
+    // Check every pair of pieces for actual connections (where connection points are very close)
+  for (let i = 0; i < pieces.length; i++) {
+    for (let j = i + 1; j < pieces.length; j++) {
+      const piece1 = pieces[i];
+      const piece2 = pieces[j];
       
-      if (distance <= snapDistance && canConnect(newConn, existingConn)) {
-        connectionsFound++;
-        break; // Only count one connection per connection point
+      // Get connections for both pieces
+      const connections1 = getConnectionPoints(piece1);
+      const connections2 = getConnectionPoints(piece2);
+      
+      // Look for actual connections (where connection points are very close)
+      for (const conn1 of connections1) {
+        for (const conn2 of connections2) {
+          const connDistance = Math.sqrt(
+            Math.pow(conn1.x - conn2.x, 2) + 
+            Math.pow(conn1.y - conn2.y, 2)
+          );
+          
+          // If connection points are very close (indicating intent to connect), validate the connection
+          if (connDistance <= 0.1) { // Very tight tolerance for actual connections
+            if (!(canConnect(conn1, conn2) && 
+                  validateTrackFlow(piece1, piece2, conn1, conn2) &&
+                  hasValidGeometry(piece1, piece2, conn1, conn2))) {
+              errors.push(
+                `Invalid connection between ${piece1.type} at (${piece1.x}, ${piece1.y}) ` +
+                `and ${piece2.type} at (${piece2.x}, ${piece2.y}): ` +
+                `connection points at (${conn1.x.toFixed(2)}, ${conn1.y.toFixed(2)}) ` +
+                `and (${conn2.x.toFixed(2)}, ${conn2.y.toFixed(2)}) have invalid geometry`
+              );
+            }
+          }
+        }
       }
     }
   }
   
-  // Simply require at least one valid connection when snapping
-  return connectionsFound >= 1;
+  // Additional validation: check for specific invalid patterns
+  for (const piece of pieces) {
+    if (piece.type === 'straight') {
+      // For straight pieces, validate that their connection points make sense
+      const connections = getConnectionPoints(piece);
+      for (const conn of connections) {
+        const distanceFromCenter = Math.sqrt(
+          Math.pow(conn.x - piece.x, 2) + 
+          Math.pow(conn.y - piece.y, 2)
+        );
+        
+        // Connection should be exactly 2 grid units from center (half of length 4)
+        if (Math.abs(distanceFromCenter - 2) > 0.1) {
+          errors.push(
+            `Straight piece at (${piece.x}, ${piece.y}) has invalid connection geometry: ` +
+            `connection at (${conn.x.toFixed(2)}, ${conn.y.toFixed(2)}) is ${distanceFromCenter.toFixed(2)} units from center, expected 2.0`
+          );
+        }
+      }
+    }
+  }
+  
+  // Enhanced validation: Check for problematic track flow patterns
+  // ONLY apply this to very specific simple layouts that are clearly problematic
+  if (pieces.length === 3) {
+    const straight = pieces.find(p => p.type === 'straight');
+    const curves = pieces.filter(p => p.type === 'curve');
+    
+    if (straight && curves.length === 2) {
+      // Only check for the very specific problematic pattern:
+      // - Exactly 1 horizontal straight piece
+      // - Exactly 2 curves with opposing rotations that create a "T" shape
+      // - Curves are positioned at the straight piece ends
+      const straightAngle = (straight.rotation * 180 / Math.PI) % 360;
+      const isHorizontal = Math.abs(straightAngle) < 5 || Math.abs(straightAngle - 180) < 5;
+      
+      if (isHorizontal) {
+        const curve1Angle = (curves[0].rotation * 180 / Math.PI) % 360;
+        const curve2Angle = (curves[1].rotation * 180 / Math.PI) % 360;
+        
+        // Check if one curve is at ~0° and the other at ~180° (opposing)
+        const hasOpposingCurves = 
+          (Math.abs(curve1Angle) < 5 && Math.abs(curve2Angle - 180) < 5) ||
+          (Math.abs(curve1Angle - 180) < 5 && Math.abs(curve2Angle) < 5);
+        
+        // Also check that curves are positioned at the straight piece ends
+        const straightLength = 2; // Half length of straight piece
+        const leftEnd = { x: straight.x - straightLength, y: straight.y };
+        const rightEnd = { x: straight.x + straightLength, y: straight.y };
+        
+        const curve1AtEnd = curves.some(c => 
+          Math.abs(c.x - leftEnd.x) < 0.5 && Math.abs(c.y - leftEnd.y) < 0.5) ||
+          curves.some(c => Math.abs(c.x - rightEnd.x) < 0.5 && Math.abs(c.y - rightEnd.y) < 0.5);
+        
+        if (hasOpposingCurves && curve1AtEnd) {
+          // Get the curve end points to check if they diverge
+          const curve1Connections = getConnectionPoints(curves[0]);
+          const curve2Connections = getConnectionPoints(curves[1]);
+          
+          // Get the "exit" points (female connections) of both curves
+          const curve1Exit = curve1Connections.find(c => c.type === 'female');
+          const curve2Exit = curve2Connections.find(c => c.type === 'female');
+          
+          if (curve1Exit && curve2Exit) {
+            // Check if the curves are diverging (exit points moving apart)
+            const exitDistance = Math.sqrt(
+              Math.pow(curve1Exit.x - curve2Exit.x, 2) + 
+              Math.pow(curve1Exit.y - curve2Exit.y, 2)
+            );
+            
+            // If exit points are far apart, the curves are diverging
+            if (exitDistance > 6) {
+              errors.push(
+                `Invalid track flow: Curves are diverging away from each other instead of forming a continuous path. ` +
+                `This creates an open "Y" or "T" shape rather than a connected track layout. ` +
+                `Exit points are ${exitDistance.toFixed(2)} units apart.`
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  const isValid = errors.length === 0;
+  
+  if (!isValid) {
+    console.log('🚨 Layout validation failed:', errors);
+  } else {
+    console.log('✅ Layout validation passed');
+  }
+  
+  return { isValid, errors };
 }
 
 /**
@@ -290,7 +1048,10 @@ export function getConnectionIndicators(pieces: TrackPiece[]): ConnectionPoint[]
   const allConnections: ConnectionPoint[] = [];
   
   for (const piece of pieces) {
-    allConnections.push(...getConnectionPoints(piece));
+    const connections = getConnectionPoints(piece);
+    console.log(`Piece ${piece.type} at (${piece.x}, ${piece.y}) rotation ${(piece.rotation * 180 / Math.PI).toFixed(1)}°:`, 
+      connections.map(c => `${c.type} at (${c.x.toFixed(2)}, ${c.y.toFixed(2)}) angle ${(c.angle * 180 / Math.PI).toFixed(1)}°`));
+    allConnections.push(...connections);
   }
   
   return allConnections;

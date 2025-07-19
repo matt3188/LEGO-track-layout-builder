@@ -36,6 +36,7 @@ export {
   getConnectionPoints, 
   canConnect, 
   findSnapPosition, 
-  getConnectionIndicators 
+  getConnectionIndicators,
+  validateLayout
 } from './connections';
 export type { ConnectionPoint, SnapResult } from './connections';

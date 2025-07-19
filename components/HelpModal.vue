@@ -23,7 +23,7 @@ const shortcuts = [
   {
     title: 'Rotation',
     items: [
-      { keys: ['F'], description: 'Flip piece 180°C' },
+      { keys: ['F'], description: 'Flip piece horizontally' },
       { keys: ['R'], description: 'Rotate piece clockwise' },
       { keys: ['Shift', 'R'], description: 'Rotate piece counter-clockwise' }
     ]

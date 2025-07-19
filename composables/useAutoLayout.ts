@@ -54,7 +54,6 @@ export function useAutoLayout() {
     // Find the best strategy that can handle the given pieces
     for (const strategy of strategies) {
       if (strategy.canBuild(straightCount, curveCount)) {
-        console.log(`Using strategy: ${strategy.name}`);
         return strategy.build(straightCount, curveCount);
       }
     }
