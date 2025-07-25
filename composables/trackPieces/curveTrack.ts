@@ -4,10 +4,17 @@ export function drawCurveTrack(
   piece: TrackPiece,
   context: TrackRenderingContext
 ): void {
-  const { ctx, zoom, isGhost = false, isHovered = false, isDeleteMode = false } = context;
+  const {
+    ctx,
+    zoom,
+    isGhost = false,
+    isHovered = false,
+    isDeleteMode = false,
+    isInvalidPlacement = false
+  } = context;
   
   // Set colors - red for hovered pieces in delete mode, grey otherwise
-  const isHighlighted = isHovered && isDeleteMode;
+  const isHighlighted = (isHovered && isDeleteMode) || isInvalidPlacement;
   const railColor = isHighlighted ? '#ff0000' : '#666666';
   const tieColor = isHighlighted ? '#ff6b6b' : '#888888';
   const ballastColor = isHighlighted ? '#ffcccc' : '#aaaaaa';

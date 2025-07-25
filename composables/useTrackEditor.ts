@@ -125,7 +125,12 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
-  function drawTrackPiece(piece: TrackPiece, isGhost = false, isHovered = false): void {
+  function drawTrackPiece(
+    piece: TrackPiece,
+    isGhost = false,
+    isHovered = false,
+    isInvalid = false
+  ): void {
     if (!ctx) return;
 
     const [posX, posY] = toCanvasCoords(piece.x, piece.y);
@@ -153,7 +158,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       zoom: zoom.value,
       isGhost,
       isHovered,
-      isDeleteMode: isDeleteMode.value
+      isDeleteMode: isDeleteMode.value,
+      isInvalidPlacement: isInvalid
     });
 
     ctx.restore();
@@ -162,10 +168,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function drawGhostPiece(): void {
     if (!ghostPiece.value) return;
-    
+
     // Draw the snapped version if available, otherwise the regular ghost
     const pieceToRender = snappedGhostPiece.value || ghostPiece.value;
-    drawTrackPiece(pieceToRender, true);
+    const overlaps = pieces.value.some((p) => wouldOverlap(pieceToRender, p));
+    drawTrackPiece(pieceToRender, true, false, overlaps);
   }
 
   function drawConnectionPoints(): void {
