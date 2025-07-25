@@ -435,7 +435,7 @@ export function findSnapPosition(
   
   for (const pieceVariant of piecesToTry) {
     // Try different rotations to see if any create valid connections
-    const rotationSteps = pieceVariant.type === 'curve' ? 16 : 4; // 22.5° for curves, 90° for straights
+    const rotationSteps = 16; // Allow 22.5° increments for all pieces
     const rotationIncrement = (2 * Math.PI) / rotationSteps;
     
     for (let rotStep = 0; rotStep < rotationSteps; rotStep++) {
@@ -626,6 +626,21 @@ function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     return true;
   }
   
+  return false;
+}
+
+/**
+ * Check if a piece overlaps with any in a list
+ */
+export function checkCollision(
+  piece: TrackPiece,
+  others: TrackPiece[]
+): boolean {
+  for (const other of others) {
+    if (wouldOverlap(piece, other)) {
+      return true;
+    }
+  }
   return false;
 }
 

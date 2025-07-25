@@ -32,10 +32,11 @@ export { drawCurveTrack } from './curveTrack';
 export type { TrackPiece, GhostPiece, TrackPieceType, TrackRenderingContext } from './types';
 
 // Export connection system
-export { 
-  getConnectionPoints, 
-  canConnect, 
-  findSnapPosition, 
+export {
+  getConnectionPoints,
+  canConnect,
+  findSnapPosition,
+  checkCollision,
   getConnectionIndicators,
   validateLayout
 } from './connections';

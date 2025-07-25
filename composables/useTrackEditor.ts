@@ -4,7 +4,8 @@ import {
   findSnapPosition, 
   getConnectionIndicators,
   validateLayout,
-  type TrackPiece, 
+  checkCollision,
+  type TrackPiece,
   type GhostPiece, 
   type TrackPieceType,
   type ConnectionPoint 
@@ -433,6 +434,30 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       const exactY = (mouseY - py) / gridSize - offsetY;
       draggingPiece.value.x = exactX;
       draggingPiece.value.y = exactY;
+
+      // Attempt piece-to-piece snapping while dragging
+      if (!isShiftPressed.value) {
+        const others = pieces.value.filter(p => p !== draggingPiece.value);
+        const snapDist = 20 / getGridSize();
+        const snap = findSnapPosition(draggingPiece.value, others, snapDist);
+        if (snap) {
+          const candidate = {
+            ...draggingPiece.value,
+            x: snap.position.x,
+            y: snap.position.y,
+            rotation: snap.rotation,
+            flipped:
+              snap.flipped !== undefined
+                ? snap.flipped
+                : draggingPiece.value.flipped,
+          } as TrackPiece;
+
+          if (!checkCollision(candidate, others)) {
+            Object.assign(draggingPiece.value, candidate);
+          }
+        }
+      }
+
       redraw();
     } else if (isPanning.value) {
       offsetPanX.value += mouseX - panStartX.value;
@@ -569,7 +594,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       return false;
     }
     
-    const rotationStep = draggingPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+    const rotationStep = Math.PI / 8;
     draggingPiece.value.rotation = (draggingPiece.value.rotation + rotationStep) % (2 * Math.PI);
     redraw();
     return true;
@@ -589,7 +614,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       return false;
     }
     
-    const rotationStep = ghostPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+    const rotationStep = Math.PI / 8;
     const direction = e.shiftKey ? -1 : 1;
     
     ghostPiece.value.rotation = 
