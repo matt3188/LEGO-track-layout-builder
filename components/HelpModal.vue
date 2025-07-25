@@ -33,7 +33,8 @@ const shortcuts = [
     items: [
       { keys: ['Cmd/Ctrl', '0'], description: 'Reset zoom and center view' },
       { keys: ['Mouse Wheel'], description: 'Zoom in/out' },
-      { keys: ['Click + Drag'], description: 'Pan the view' }
+      { keys: ['Click + Drag'], description: 'Pan the view' },
+      { keys: ['H'], description: 'Toggle HUD visibility' }
     ]
   },
   {

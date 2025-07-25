@@ -18,6 +18,7 @@ Current features:
 - Paste your track schema
 - Auto layout - enter number of straight and curved pieces in your collection and see what layout is possible
 - Keyboard shortcuts
+- Toggle HUD with <kbd>H</kbd>
 
 Upcoming features:
 - Add more track pieces
