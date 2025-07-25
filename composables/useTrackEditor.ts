@@ -4,10 +4,11 @@ import {
   findSnapPosition, 
   getConnectionIndicators,
   validateLayout,
-  type TrackPiece, 
-  type GhostPiece, 
+  wouldOverlap,
+  type TrackPiece,
+  type GhostPiece,
   type TrackPieceType,
-  type ConnectionPoint 
+  type ConnectionPoint
 } from './trackPieces';
 
 interface UseTrackEditorOptions {
@@ -124,7 +125,12 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
-  function drawTrackPiece(piece: TrackPiece, isGhost = false, isHovered = false): void {
+  function drawTrackPiece(
+    piece: TrackPiece,
+    isGhost = false,
+    isHovered = false,
+    isInvalid = false
+  ): void {
     if (!ctx) return;
 
     const [posX, posY] = toCanvasCoords(piece.x, piece.y);
@@ -152,7 +158,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       zoom: zoom.value,
       isGhost,
       isHovered,
-      isDeleteMode: isDeleteMode.value
+      isDeleteMode: isDeleteMode.value,
+      isInvalidPlacement: isInvalid
     });
 
     ctx.restore();
@@ -161,10 +168,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function drawGhostPiece(): void {
     if (!ghostPiece.value) return;
-    
+
     // Draw the snapped version if available, otherwise the regular ghost
     const pieceToRender = snappedGhostPiece.value || ghostPiece.value;
-    drawTrackPiece(pieceToRender, true);
+    const overlaps = pieces.value.some((p) => wouldOverlap(pieceToRender, p));
+    drawTrackPiece(pieceToRender, true, false, overlaps);
   }
 
   function drawConnectionPoints(): void {
@@ -500,6 +508,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       };
     }
     
+    // Prevent placing pieces on top of existing ones
+    const overlaps = pieces.value.some(p => wouldOverlap(pieceToPlace, p));
+    if (overlaps) {
+      console.warn('Piece overlaps with an existing piece, placement aborted');
+      return;
+    }
+
     pieces.value.push(pieceToPlace);
     
     // Update ghost piece for next placement

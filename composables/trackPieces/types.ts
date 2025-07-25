@@ -16,4 +16,6 @@ export interface TrackRenderingContext {
   isGhost?: boolean;
   isHovered?: boolean;
   isDeleteMode?: boolean;
+  /** Whether this piece is being rendered in a location that isn't valid */
+  isInvalidPlacement?: boolean;
 }
