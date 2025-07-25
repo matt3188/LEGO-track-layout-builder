@@ -1,4 +1,5 @@
 import { ref, type Ref } from '#imports';
+import { ROTATION_STEP } from './constants';
 import { 
   renderTrackPiece, 
   findSnapPosition, 
@@ -77,7 +78,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
           dist >= 300 * zoom.value &&  // Inner radius
           dist <= 340 * zoom.value &&  // Outer radius
           normalizedAngle >= 0 &&
-          normalizedAngle <= Math.PI / 8
+          normalizedAngle <= ROTATION_STEP
         ) {
           return piece;
         }
@@ -594,8 +595,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       return false;
     }
     
-    const rotationStep = Math.PI / 8;
-    draggingPiece.value.rotation = (draggingPiece.value.rotation + rotationStep) % (2 * Math.PI);
+    draggingPiece.value.rotation =
+      (draggingPiece.value.rotation + ROTATION_STEP) % (2 * Math.PI);
     redraw();
     return true;
   }
@@ -614,11 +615,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       return false;
     }
     
-    const rotationStep = Math.PI / 8;
     const direction = e.shiftKey ? -1 : 1;
-    
-    ghostPiece.value.rotation = 
-      (ghostPiece.value.rotation + direction * rotationStep + 2 * Math.PI) % (2 * Math.PI);
+
+    ghostPiece.value.rotation =
+      (ghostPiece.value.rotation + direction * ROTATION_STEP + 2 * Math.PI) % (2 * Math.PI);
     redraw();
     return true;
   }

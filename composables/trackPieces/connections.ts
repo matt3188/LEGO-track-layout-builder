@@ -1,4 +1,5 @@
 import type { TrackPiece } from './types';
+import { ROTATION_STEP } from '../constants';
 
 export interface ConnectionPoint {
   x: number;
@@ -157,7 +158,7 @@ export function canConnectWithRotation(
   while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
   
   // Snap to valid rotation increments
-  const rotationStep = piece1.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+  const rotationStep = piece1.type === 'curve' ? ROTATION_STEP : Math.PI / 2;
   const snappedRotation = Math.round(rotationDelta / rotationStep) * rotationStep;
   
   // Check if the snapped rotation creates a valid alignment
@@ -313,7 +314,7 @@ function validateStraightToCurve(
     7 * Math.PI / 4  // 315° difference
   ];
   
-  const tolerance = Math.PI / 8; // 22.5° tolerance
+  const tolerance = ROTATION_STEP; // 22.5° tolerance
   const isValidOrientation = validOrientations.some(validAngle => 
     Math.abs(normalizedRotDiff - validAngle) < tolerance
   );

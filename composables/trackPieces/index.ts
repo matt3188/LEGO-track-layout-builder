@@ -30,6 +30,7 @@ export function renderTrackPiece(
 export { drawStraightTrack } from './straightTrack';
 export { drawCurveTrack } from './curveTrack';
 export type { TrackPiece, GhostPiece, TrackPieceType, TrackRenderingContext } from './types';
+export { ROTATION_STEP } from '../constants';
 
 // Export connection system
 export {
