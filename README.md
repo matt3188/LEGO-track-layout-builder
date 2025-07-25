@@ -13,6 +13,7 @@ Current features:
 - Rotate pieces
 - Flip pieces
 - Ghost piece to see the placement and orientation
+- Track piece count showing number of straights and curves placed (including loaded layouts)
 - Undo track placement
 - Copy your track schema
 - Paste your track schema

@@ -1,4 +1,4 @@
-import { ref, type Ref } from '#imports';
+import { ref, computed, type Ref } from '#imports';
 import { 
   renderTrackPiece, 
   findSnapPosition, 
@@ -17,6 +17,14 @@ interface UseTrackEditorOptions {
 
 export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const pieces = ref<TrackPiece[]>([]);
+  const pieceCounts = computed(() => {
+    const counts: Record<string, number> = {};
+    for (const p of pieces.value) {
+      if (!p.type) continue;
+      counts[p.type] = (counts[p.type] || 0) + 1;
+    }
+    return counts;
+  });
   const zoom = ref(1);
   let offsetX = 0;
   let offsetY = 0;
@@ -849,5 +857,6 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     cleanup,
     generateAutoLayout,
     loadLayout,
+    pieceCounts,
   };
 }
