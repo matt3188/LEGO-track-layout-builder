@@ -8,6 +8,7 @@ import HelpModal from './HelpModal.vue';
 const canvas = ref(null);
 const copyStatus = ref('');
 const showHelp = ref(false);
+const showHud = ref(true);
 
 // Auto-layout generation state
 const straightCount = ref(8);
@@ -37,6 +38,13 @@ const {
 const { handlePaste } = useClipboard(copyStatus);
 
 function handleGlobalKeyDown(e: KeyboardEvent) {
+  // Handle HUD toggle
+  if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    showHud.value = !showHud.value;
+    return;
+  }
+
   // Handle help modal toggle
   if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
@@ -77,6 +85,7 @@ onUnmounted(() => {
     <canvas ref="canvas" id="trackCanvas" class="border border-gray-300 block"></canvas>
     
     <ControlPanel
+      v-if="showHud"
       :copy-status="copyStatus"
       :is-delete-mode="isDeleteMode"
       :on-add-straight="addStraight"
@@ -89,7 +98,7 @@ onUnmounted(() => {
       :on-show-auto-layout="() => showAutoLayout = true"
     />
 
-    <HelpButton @click="showHelp = true" />
+    <HelpButton v-if="showHud" @click="showHelp = true" />
 
     <AutoLayoutModal 
       :show="showAutoLayout"
