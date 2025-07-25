@@ -4,10 +4,11 @@ import {
   findSnapPosition, 
   getConnectionIndicators,
   validateLayout,
-  type TrackPiece, 
-  type GhostPiece, 
+  wouldOverlap,
+  type TrackPiece,
+  type GhostPiece,
   type TrackPieceType,
-  type ConnectionPoint 
+  type ConnectionPoint
 } from './trackPieces';
 
 interface UseTrackEditorOptions {
@@ -500,6 +501,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       };
     }
     
+    // Prevent placing pieces on top of existing ones
+    const overlaps = pieces.value.some(p => wouldOverlap(pieceToPlace, p));
+    if (overlaps) {
+      console.warn('Piece overlaps with an existing piece, placement aborted');
+      return;
+    }
+
     pieces.value.push(pieceToPlace);
     
     // Update ghost piece for next placement

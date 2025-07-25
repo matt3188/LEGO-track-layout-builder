@@ -586,7 +586,7 @@ function isValidConnection(
 /**
  * Check if two pieces would physically overlap in an invalid way
  */
-function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
+export function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
   // Calculate the distance between piece centers
   const centerDistance = Math.sqrt(
     Math.pow(piece1.x - piece2.x, 2) + Math.pow(piece1.y - piece2.y, 2)
