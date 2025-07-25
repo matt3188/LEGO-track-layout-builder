@@ -29,10 +29,12 @@ const {
   clearPieces,
   isDeleteMode,
   showConnectionPoints,
+  pieceCounts,
 } = useTrackEditor({
   canvas,
   copyStatus,
 });
+
 
 // Use clipboard composable
 const { handlePaste } = useClipboard(copyStatus);
@@ -89,6 +91,7 @@ onUnmounted(() => {
         v-if="showHud"
         :copy-status="copyStatus"
         :is-delete-mode="isDeleteMode"
+        :piece-counts="pieceCounts"
         :on-add-straight="addStraight"
         :on-add-curve="addCurve"
         :on-enable-delete-mode="enableDeleteMode"
