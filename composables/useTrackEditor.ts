@@ -180,10 +180,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   function drawInvalidZones(): void {
     if (!ctx || !ghostPiece.value) return;
     const gridSize = getGridSize();
-    const ghostType = ghostPiece.value.type;
-
-    // Draw zone around the ghost piece itself
-    let ghostRadius = ghostType === 'straight' ? 3.5 : 1.5;
+    // Draw zone around the ghost piece itself using a consistent radius
+    const ghostRadius = 3.5;
     const [gx, gy] = toCanvasCoords(ghostPiece.value.x, ghostPiece.value.y);
     ctx.save();
     ctx.globalAlpha = 0.2;
@@ -194,10 +192,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     ctx.restore();
 
     for (const p of pieces.value) {
-      let radius = 1.5;
-      if (ghostType === 'straight' && p.type === 'straight') {
-        radius = 3.5;
-      }
+      let radius = 3.5;
       const [cx, cy] = toCanvasCoords(p.x, p.y);
       ctx.save();
       ctx.globalAlpha = 0.2;
