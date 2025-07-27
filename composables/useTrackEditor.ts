@@ -30,6 +30,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const ghostPiece = ref<GhostPiece | null>(null);
   const snappedGhostPiece = ref<GhostPiece | null>(null); // Snapped version of ghost piece
   const draggingPiece = ref<TrackPiece | null>(null);
+  let dragStartPiece: TrackPiece | null = null;
   const hoveredPiece = ref<TrackPiece | null>(null);
   const isDeleteMode = ref(false);
   const showConnectionPoints = ref(false); // Debug: show connection points
@@ -392,6 +393,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     const pieceAtPosition = findPieceAtPosition(mouseX, mouseY);
     if (pieceAtPosition) {
       draggingPiece.value = pieceAtPosition;
+      dragStartPiece = { ...pieceAtPosition };
       const [px, py] = toCanvasCoords(pieceAtPosition.x, pieceAtPosition.y);
       offsetX = (mouseX - px) / gridSize;
       offsetY = (mouseY - py) / gridSize;
@@ -453,7 +455,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function handleMouseUp(e: MouseEvent): void {
     if (draggingPiece.value) {
+      const overlap = pieces.value.some(
+        (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+      );
+      if (overlap && dragStartPiece) {
+        draggingPiece.value.x = dragStartPiece.x;
+        draggingPiece.value.y = dragStartPiece.y;
+        draggingPiece.value.rotation = dragStartPiece.rotation;
+        draggingPiece.value.flipped = dragStartPiece.flipped;
+      }
       draggingPiece.value = null;
+      dragStartPiece = null;
       saveHistoryIfChanged();
     }
     isPanning.value = false;
@@ -583,9 +595,16 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     if (!draggingPiece.value || (e.key !== 'r' && e.key !== 'R')) {
       return false;
     }
-    
+
     const rotationStep = draggingPiece.value.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+    const originalRotation = draggingPiece.value.rotation;
     draggingPiece.value.rotation = (draggingPiece.value.rotation + rotationStep) % (2 * Math.PI);
+    const overlap = pieces.value.some(
+      (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+    );
+    if (overlap) {
+      draggingPiece.value.rotation = originalRotation;
+    }
     redraw();
     return true;
   }
@@ -617,8 +636,15 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     if (!draggingPiece.value || (e.key !== 'f' && e.key !== 'F')) {
       return false;
     }
-    
+
+    const originalFlipped = draggingPiece.value.flipped;
     draggingPiece.value.flipped = !draggingPiece.value.flipped;
+    const overlap = pieces.value.some(
+      (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+    );
+    if (overlap) {
+      draggingPiece.value.flipped = originalFlipped;
+    }
     redraw();
     return true;
   }
