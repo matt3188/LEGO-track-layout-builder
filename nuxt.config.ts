@@ -3,7 +3,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   devtools: { enabled: false },
   modules: [
-    '@nuxtjs/tailwindcss'
+    '@nuxtjs/tailwindcss',
+    '@pinia/nuxt'
   ],
   app: {
     baseURL: process.env.NODE_ENV === 'production' ? '/LEGO-track-layout-builder/' : '/',

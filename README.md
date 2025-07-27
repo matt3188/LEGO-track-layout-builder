@@ -14,8 +14,7 @@ Current features:
 - Flip pieces
 - Ghost piece to see the placement and orientation
 - Undo track placement
-- Copy your track schema
-- Paste your track schema
+- Save your track layout and load it later
 - Auto layout - enter number of straight and curved pieces in your collection and see what layout is possible
 - Keyboard shortcuts
 - Toggle HUD with <kbd>H</kbd>

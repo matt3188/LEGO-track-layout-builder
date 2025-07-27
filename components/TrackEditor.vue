@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useSavedLayouts } from '~/composables/useSavedLayouts';
 import ControlPanel from './ControlPanel.vue';
 import AutoLayoutModal from './AutoLayoutModal.vue';
 import HelpButton from './HelpButton.vue';
@@ -15,12 +16,12 @@ const straightCount = ref(8);
 const curveCount = ref(8);
 const showAutoLayout = ref(false);
 
+
 const {
   addStraight,
   addCurve,
   enableDeleteMode,
   undoLastAction,
-  copyLayout,
   loadLayout,
   generateAutoLayout,
   handleKeyDown,
@@ -29,13 +30,17 @@ const {
   clearPieces,
   isDeleteMode,
   showConnectionPoints,
+  pieces,
 } = useTrackEditor({
   canvas,
   copyStatus,
 });
 
-// Use clipboard composable
-const { handlePaste } = useClipboard(copyStatus);
+const {
+  handleSaveLayout,
+  handleLoadLayout,
+  hasSavedLayouts
+} = useSavedLayouts(pieces, loadLayout, copyStatus);
 
 function handleGlobalKeyDown(e: KeyboardEvent) {
   // Handle HUD toggle
@@ -63,6 +68,7 @@ function handleGlobalKeyDown(e: KeyboardEvent) {
     handleKeyDown(e);
   }
 }
+
 
 function handleGenerateAutoLayout() {
   generateAutoLayout(straightCount.value, curveCount.value);
@@ -92,9 +98,10 @@ onUnmounted(() => {
         :on-add-straight="addStraight"
         :on-add-curve="addCurve"
         :on-enable-delete-mode="enableDeleteMode"
-      :on-undo="undoLastAction"
-      :on-copy="copyLayout"
-      :on-paste="() => handlePaste(loadLayout)"
+        :on-undo="undoLastAction"
+        :on-save-layout="handleSaveLayout"
+        :on-load-layout="handleLoadLayout"
+        :has-saved-layouts="hasSavedLayouts"
         :on-clear="clearPieces"
         :on-show-auto-layout="() => showAutoLayout = true"
       />

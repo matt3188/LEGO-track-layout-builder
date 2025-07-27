@@ -8,10 +8,11 @@ interface Props {
   onAddCurve?: () => void;
   onEnableDeleteMode?: () => void;
   onUndo?: () => void;
-  onCopy?: () => void;
-  onPaste?: () => void;
   onClear?: () => void;
   onShowAutoLayout?: () => void;
+  onSaveLayout?: () => void;
+  onLoadLayout?: () => void;
+  hasSavedLayouts?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -22,6 +23,7 @@ interface ControlButton {
   label: string;
   action?: () => void;
   class: ButtonClass;
+  disabled?: boolean;
 }
 
 // Define control buttons configuration
@@ -47,14 +49,15 @@ const controlButtons = computed((): ControlButton[] => [
     class: 'button-default'
   },
   {
-    label: '📋 Copy schema',
-    action: props.onCopy,
+    label: '💾 Save Layout',
+    action: props.onSaveLayout,
     class: 'button-default'
   },
   {
-    label: '📄 Paste schema',
-    action: props.onPaste,
-    class: 'button-default'
+    label: '📂 Load Layout',
+    action: props.onLoadLayout,
+    class: 'button-default',
+    disabled: !props.hasSavedLayouts
   },
   {
     label: '❌ Clear',
@@ -78,11 +81,12 @@ const buttonClasses: Record<ButtonClass, string> = {
 
 <template>
   <div class="fixed top-4 left-4 flex flex-col gap-2">
-    <button 
+    <button
       v-for="button in controlButtons"
       :key="button.label"
       @click="button.action"
       :class="buttonClasses[button.class]"
+      :disabled="button.disabled"
     >
       {{ button.label }}
     </button>
