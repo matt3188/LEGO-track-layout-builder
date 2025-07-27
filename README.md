@@ -6,6 +6,25 @@ https://matt3188.github.io/LEGO-track-layout-builder/
 As a LEGO enthusiast I wanted to create something that the community could use
 to build out track layouts; Both from scratch and with the help of AI.
 
+## Getting Started
+
+1. Install dependencies
+
+   ```bash
+   pnpm install
+   ```
+
+2. Start the development server
+
+   ```bash
+   pnpm dev
+   ```
+
+   Open the URL printed in the terminal to view the editor.
+
+Use <kbd>H</kbd> to toggle the HUD and open the Auto Layout modal from the
+toolbar to generate layouts automatically.
+
 Current features:
 - Add straight and curve pieces to create a layout
 - Delete individual track pieces

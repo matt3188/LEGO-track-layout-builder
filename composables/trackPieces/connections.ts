@@ -866,10 +866,13 @@ export function validateLayout(pieces: TrackPiece[]): { isValid: boolean; errors
  */
 export function getConnectionIndicators(pieces: TrackPiece[]): ConnectionPoint[] {
   const allConnections: ConnectionPoint[] = [];
-  
+
   for (const piece of pieces) {
     const connections = getConnectionPoints(piece);
+    for (const conn of connections) {
+      allConnections.push(conn);
+    }
   }
-  
+
   return allConnections;
 }

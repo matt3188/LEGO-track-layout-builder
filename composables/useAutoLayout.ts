@@ -51,15 +51,31 @@ export function useAutoLayout() {
       }
     ];
 
-    // Find the best strategy that can handle the given pieces
+    let bestLayout: TrackPiece[] = [];
+
     for (const strategy of strategies) {
-      if (strategy.canBuild(straightCount, curveCount)) {
-        return strategy.build(straightCount, curveCount);
+      if (!strategy.canBuild(straightCount, curveCount)) continue;
+
+      const baseLayout = strategy.build(straightCount, curveCount);
+
+      const usedStraights = baseLayout.filter(p => p.type === 'straight').length;
+      const usedCurves = baseLayout.filter(p => p.type === 'curve').length;
+
+      const remainingStraights = Math.max(0, straightCount - usedStraights);
+      const remainingCurves = Math.max(0, curveCount - usedCurves);
+
+      const layout = [...baseLayout];
+
+      if (tryFillRemaining(layout, remainingStraights, remainingCurves)) {
+        return layout;
+      }
+
+      if (layout.length > bestLayout.length) {
+        bestLayout = layout;
       }
     }
 
-    // Fallback (should never reach here)
-    return [];
+    return bestLayout;
   }
 
   /**
@@ -315,7 +331,7 @@ export function useAutoLayout() {
   function wouldCollide(newPiece: TrackPiece, existingPieces: TrackPiece[]): boolean {
     for (const existingPiece of existingPieces) {
       const distance = Math.sqrt(
-        Math.pow(newPiece.x - existingPiece.x, 2) + 
+        Math.pow(newPiece.x - existingPiece.x, 2) +
         Math.pow(newPiece.y - existingPiece.y, 2)
       );
       
@@ -324,6 +340,45 @@ export function useAutoLayout() {
         return true;
       }
     }
+    return false;
+  }
+
+  function tryFillRemaining(
+    pieces: TrackPiece[],
+    straightsLeft: number,
+    curvesLeft: number,
+    depth = 0
+  ): boolean {
+    if (straightsLeft === 0 && curvesLeft === 0) return true;
+    if (depth > (straightsLeft + curvesLeft) * 2) return false;
+
+    const openConnections = findOpenConnections(pieces);
+    if (openConnections.length === 0) return false;
+
+    for (const conn of openConnections) {
+      if (straightsLeft > 0) {
+        const piece = createConnectingPiece(conn, 'straight');
+        if (piece && !wouldCollide(piece, pieces)) {
+          pieces.push(piece);
+          if (tryFillRemaining(pieces, straightsLeft - 1, curvesLeft, depth + 1)) {
+            return true;
+          }
+          pieces.pop();
+        }
+      }
+
+      if (curvesLeft > 0) {
+        const piece = createConnectingPiece(conn, 'curve');
+        if (piece && !wouldCollide(piece, pieces)) {
+          pieces.push(piece);
+          if (tryFillRemaining(pieces, straightsLeft, curvesLeft - 1, depth + 1)) {
+            return true;
+          }
+          pieces.pop();
+        }
+      }
+    }
+
     return false;
   }
 
