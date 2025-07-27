@@ -1,7 +1,7 @@
 <template>
-  <div class="h-screen w-screen overflow-hidden m-0 p-0">
     <TrackEditor />
-  </div>
+  <UApp class="h-screen w-screen overflow-hidden m-0 p-0">
+  </UApp>
 </template>
 
 <style>
