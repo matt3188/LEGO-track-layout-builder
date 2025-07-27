@@ -1,5 +1,6 @@
 <template>
   <UApp class="h-screen w-screen overflow-hidden m-0 p-0">
+    <ColorMode class="absolute top-4 right-4 z-10" />
     <NuxtPage />
   </UApp>
 </template>
