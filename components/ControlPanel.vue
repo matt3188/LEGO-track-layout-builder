@@ -4,6 +4,7 @@ import { computed } from 'vue';
 interface Props {
   copyStatus?: string;
   isDeleteMode?: boolean;
+  pieceCounts?: Record<string, number>;
   onAddStraight?: () => void;
   onAddCurve?: () => void;
   onEnableDeleteMode?: () => void;
@@ -78,7 +79,7 @@ const buttonClasses: Record<ButtonClass, string> = {
 
 <template>
   <div class="fixed top-4 left-4 flex flex-col gap-2">
-    <button 
+    <button
       v-for="button in controlButtons"
       :key="button.label"
       @click="button.action"
@@ -87,5 +88,8 @@ const buttonClasses: Record<ButtonClass, string> = {
       {{ button.label }}
     </button>
     <span class="text-sm text-gray-600">{{ copyStatus }}</span>
+    <div v-if="pieceCounts" class="text-sm text-gray-600">
+      Straights: {{ pieceCounts.straight }} | Curves: {{ pieceCounts.curve }}
+    </div>
   </div>
 </template>
