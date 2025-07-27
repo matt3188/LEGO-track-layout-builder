@@ -34,6 +34,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const hoveredPiece = ref<TrackPiece | null>(null);
   const isDeleteMode = ref(false);
   const showConnectionPoints = ref(false); // Debug: show connection points
+  const showInvalidZones = ref(false); // Debug: show invalid placement zones
   const lastMouseX = ref(0);
   const lastMouseY = ref(0);
   const historyStack = ref<TrackPiece[][]>([]);
@@ -176,6 +177,38 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     drawTrackPiece(pieceToRender, true, false, overlaps);
   }
 
+  function drawInvalidZones(): void {
+    if (!ctx || !ghostPiece.value) return;
+    const gridSize = getGridSize();
+    const ghostType = ghostPiece.value.type;
+
+    // Draw zone around the ghost piece itself
+    let ghostRadius = ghostType === 'straight' ? 3.5 : 1.5;
+    const [gx, gy] = toCanvasCoords(ghostPiece.value.x, ghostPiece.value.y);
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = 'rgba(0,0,255,0.2)';
+    ctx.beginPath();
+    ctx.arc(gx, gy, ghostRadius * gridSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    for (const p of pieces.value) {
+      let radius = 1.5;
+      if (ghostType === 'straight' && p.type === 'straight') {
+        radius = 3.5;
+      }
+      const [cx, cy] = toCanvasCoords(p.x, p.y);
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = 'rgba(0,0,255,0.3)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * gridSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawConnectionPoints(): void {
     if (!ctx) return;
     
@@ -223,6 +256,9 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
     drawGrid();
     drawGhostPiece();
+    if (showInvalidZones.value) {
+      drawInvalidZones();
+    }
     pieces.value.forEach((p) => {
       const isHovered = hoveredPiece.value === p;
       drawTrackPiece(p, false, isHovered);
@@ -584,6 +620,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       redraw();
       return;
     }
+
+    // Handle invalid zone debug toggle
+    if (e.key === 'b' || e.key === 'B') {
+      showInvalidZones.value = !showInvalidZones.value;
+      redraw();
+      return;
+    }
     
     // Handle shift key for disabling snapping
     if (e.key === 'Shift') {
@@ -872,6 +915,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     selectedPieceType,
     isDeleteMode,
     showConnectionPoints,
+    showInvalidZones,
     historyStack,
     isPanning,
     panStartX,
