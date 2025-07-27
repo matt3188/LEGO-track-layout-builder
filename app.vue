@@ -1,6 +1,6 @@
 <template>
-    <TrackEditor />
   <UApp class="h-screen w-screen overflow-hidden m-0 p-0">
+    <NuxtPage />
   </UApp>
 </template>
 
