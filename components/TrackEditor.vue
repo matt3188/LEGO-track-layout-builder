@@ -1,10 +1,4 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
-import ControlPanel from './ControlPanel.vue';
-import AutoLayoutModal from './AutoLayoutModal.vue';
-import HelpButton from './HelpButton.vue';
-import HelpModal from './HelpModal.vue';
-
 const canvas = ref(null);
 const copyStatus = ref('');
 const showHelp = ref(false);
@@ -85,8 +79,15 @@ onUnmounted(() => {
 <template>
   <div>
     <canvas ref="canvas" id="trackCanvas" class="border border-gray-300 block"></canvas>
-    
-    <transition name="control-panel">
+
+    <transition
+      enter-from-class="-translate-x-[calc(100%)] opacity-0"
+      enter-to-class="translate-x-0 opacity-100"
+      enter-active-class="transition-all duration-300 ease-in-out"
+      leave-from-class="translate-x-0 opacity-100"
+      leave-to-class="-translate-x-[calc(100%)] opacity-0"
+      leave-active-class="transition-all duration-300 ease-in-out"
+    >
       <ControlPanel
         v-if="showHud"
         :copy-status="copyStatus"
@@ -95,15 +96,22 @@ onUnmounted(() => {
         :on-add-straight="addStraight"
         :on-add-curve="addCurve"
         :on-enable-delete-mode="enableDeleteMode"
-      :on-undo="undoLastAction"
-      :on-copy="copyLayout"
-      :on-paste="() => handlePaste(loadLayout)"
+        :on-undo="undoLastAction"
+        :on-copy="copyLayout"
+        :on-paste="() => handlePaste(loadLayout)"
         :on-clear="clearPieces"
         :on-show-auto-layout="() => showAutoLayout = true"
       />
     </transition>
 
-    <transition name="help-button">
+    <transition
+      enter-from-class="translate-x-[calc(100%)] opacity-0"
+      enter-to-class="translate-x-0 opacity-100"
+      enter-active-class="transition-all duration-300 ease-in-out"
+      leave-from-class="translate-x-0 opacity-100"
+      leave-to-class="translate-x-[calc(100%)] opacity-0"
+      leave-active-class="transition-all duration-300 ease-in-out"
+    >
       <HelpButton v-if="showHud" @click="showHelp = true" />
     </transition>
 
@@ -118,35 +126,3 @@ onUnmounted(() => {
     <HelpModal :show="showHelp" @close="() => showHelp = false" />
   </div>
 </template>
-
-<style scoped>
-.control-panel-enter-from,
-.control-panel-leave-to {
-  transform: translateX(calc(-100% - 1rem));
-  opacity: 0;
-}
-.control-panel-enter-to,
-.control-panel-leave-from {
-  transform: translateX(0);
-  opacity: 1;
-}
-.control-panel-enter-active,
-.control-panel-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.help-button-enter-from,
-.help-button-leave-to {
-  transform: translateX(calc(100% + 1rem));
-  opacity: 0;
-}
-.help-button-enter-to,
-.help-button-leave-from {
-  transform: translateX(0);
-  opacity: 1;
-}
-.help-button-enter-active,
-.help-button-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-</style>

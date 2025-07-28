@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-
 interface Props {
   copyStatus?: string;
   isDeleteMode?: boolean;
@@ -28,65 +26,78 @@ interface ControlButton {
 // Define control buttons configuration
 const controlButtons = computed((): ControlButton[] => [
   {
-    label: '➕ Add Straight',
+    label: 'Add Straight',
+    icon: 'mdi:plus-thick',
     action: props.onAddStraight,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
-    label: '➕ Add Curve',
+    label: 'Add Curve',
+    icon: 'mdi:plus-thick',
     action: props.onAddCurve,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
-    label: '🗑️ Delete Mode',
-    action: props.onEnableDeleteMode,
-    class: props.isDeleteMode ? 'button-delete-active' : 'button-default'
-  },
-  {
-    label: '↩️ Undo',
+    label: 'Undo',
+    icon: 'mdi:undo-variant',
     action: props.onUndo,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
-    label: '📋 Copy schema',
+    label: 'Copy schema',
+    icon: 'mdi:content-copy',
     action: props.onCopy,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
-    label: '📄 Paste schema',
+    label: 'Paste schema',
+    icon: 'mdi:content-paste',
     action: props.onPaste,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
-    label: '❌ Clear',
+    label: 'Delete Mode',
+    icon: 'mdi:delete',
+    disabled: !props.pieceCounts.straight && !props.pieceCounts.curve,
+    action: props.onEnableDeleteMode,
+    color: props.isDeleteMode ? 'error' : 'neutral',
+    variant: props.isDeleteMode ? 'solid' : 'outline',
+  },
+  {
+    label: 'Clear layout',
+    icon: 'mdi:clear-bold',
+    disabled: !props.pieceCounts.straight && !props.pieceCounts.curve,
     action: props.onClear,
-    class: 'button-default'
+    color: 'neutral',
+    variant: 'outline'
   },
   {
     label: '🤖 Auto Layout',
     action: props.onShowAutoLayout,
-    class: 'button-primary'
+    color: 'primary',
+    variant: 'solid'
   }
 ]);
-
-// Button style classes
-const buttonClasses: Record<ButtonClass, string> = {
-  'button-default': 'px-4 py-2 border border-gray-300 rounded bg-white cursor-pointer transition-colors duration-200 hover:bg-gray-100',
-  'button-delete-active': 'px-4 py-2 border rounded cursor-pointer transition-colors duration-200 bg-red-500 text-white border-red-600',
-  'button-primary': 'px-4 py-2 border border-gray-300 rounded bg-blue-500 text-white cursor-pointer transition-colors duration-200 hover:bg-blue-600'
-};
 </script>
 
 <template>
-  <div class="fixed top-4 left-4 flex flex-col gap-2">
-    <button
+    <div class="fixed top-4 left-4 flex flex-col gap-2">
+    <UButton
       v-for="button in controlButtons"
       :key="button.label"
+      :color="button.color"
+      :disabled="button.disabled"
+      :variant="button.variant"
+      :icon="button.icon"
+      :label="button.label"
+      class="cursor-pointer"
       @click="button.action"
-      :class="buttonClasses[button.class]"
-    >
-      {{ button.label }}
-    </button>
+    />
     <span class="text-sm text-gray-600">{{ copyStatus }}</span>
     <div v-if="pieceCounts" class="text-sm text-gray-600">
       Straights: {{ pieceCounts.straight }} | Curves: {{ pieceCounts.curve }}

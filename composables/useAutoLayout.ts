@@ -1,4 +1,5 @@
 import { getConnectionPoints, canConnect, findSnapPosition, type ConnectionPoint } from './trackPieces/connections';
+import { ROTATION_STEP } from './constants';
 
 interface TrackPiece {
   x: number;
@@ -68,7 +69,7 @@ export function useAutoLayout() {
   function buildPerfectCircle(): TrackPiece[] {
     const pieces: TrackPiece[] = [];
     const totalCurves = 16;
-    const angleStep = Math.PI / 8; // 22.5 degrees per curve
+    const angleStep = ROTATION_STEP; // 22.5 degrees per curve
     
     // Based on your working example, the circle has radius ~12 and is offset
     // Start with the first curve at (4, 2) like in your example
@@ -372,7 +373,7 @@ export function useAutoLayout() {
       } else {
         remainingCurves--;
         // For curves, rotate and move to approximate end position
-        currentRotation += Math.PI / 8; // 22.5 degrees
+        currentRotation += ROTATION_STEP; // 22.5 degrees
         currentX += Math.cos(currentRotation) * 3;
         currentY += Math.sin(currentRotation) * 3;
       }
