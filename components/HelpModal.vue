@@ -55,7 +55,7 @@ const shortcuts = [
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" @click="$emit('close')">
+  <div v-if="show" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50" @click="$emit('close')">
     <div class="bg-white rounded-lg max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl" @click.stop>
       <div class="flex justify-between items-center p-6 border-b border-gray-200">
         <h2 class="text-xl font-semibold text-gray-800 m-0">Keyboard Shortcuts</h2>

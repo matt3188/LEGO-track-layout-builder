@@ -17,6 +17,10 @@ importers:
       tailwindcss:
         specifier: ^4.1.11
         version: 4.1.11
+    devDependencies:
+      '@iconify-json/mdi':
+        specifier: ^1.2.3
+        version: 1.2.3
 
 packages:
 
@@ -505,6 +509,9 @@ packages:
 
   '@floating-ui/vue@1.1.7':
     resolution: {integrity: sha512-idmAtbAIigGXN2SI5gItiXYBYtNfDTP9yIiObxgu13dgtG7ARCHlNfnR29GxP4LI4o13oiwsJ8wVgghj1lNqcw==}
+
+  '@iconify-json/mdi@1.2.3':
+    resolution: {integrity: sha512-O3cLwbDOK7NNDf2ihaQOH5F9JglnulNDFV7WprU2dSoZu3h3cWH//h74uQAB87brHmvFVxIOkuBX2sZSzYhScg==}
 
   '@iconify/collections@1.0.570':
     resolution: {integrity: sha512-4KJOpoeShq/c7ZoY3fTBfamu6G5hpPMHH8Qf1OSArb3IY/cUy3iVxtLy1uhlpuvAguHxGNycbQwoSreHryIBGA==}
@@ -4548,6 +4555,10 @@ snapshots:
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
+
+  '@iconify-json/mdi@1.2.3':
+    dependencies:
+      '@iconify/types': 2.0.0
 
   '@iconify/collections@1.0.570':
     dependencies:
