@@ -9,8 +9,9 @@ import {
   checkCollision,
   type TrackPiece,
   type GhostPiece, 
+  wouldOverlap,
   type TrackPieceType,
-  type ConnectionPoint 
+  type ConnectionPoint
 } from './trackPieces';
 
 interface UseTrackEditorOptions {
@@ -40,9 +41,11 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const ghostPiece = ref<GhostPiece | null>(null);
   const snappedGhostPiece = ref<GhostPiece | null>(null); // Snapped version of ghost piece
   const draggingPiece = ref<TrackPiece | null>(null);
+  let dragStartPiece: TrackPiece | null = null;
   const hoveredPiece = ref<TrackPiece | null>(null);
   const isDeleteMode = ref(false);
   const showConnectionPoints = ref(false); // Debug: show connection points
+  const showInvalidZones = ref(false); // Debug: show invalid placement zones
   const lastMouseX = ref(0);
   const lastMouseY = ref(0);
   const historyStack = ref<TrackPiece[][]>([]);
@@ -135,7 +138,12 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
-  function drawTrackPiece(piece: TrackPiece, isGhost = false, isHovered = false): void {
+  function drawTrackPiece(
+    piece: TrackPiece,
+    isGhost = false,
+    isHovered = false,
+    isInvalid = false
+  ): void {
     if (!ctx) return;
 
     const [posX, posY] = toCanvasCoords(piece.x, piece.y);
@@ -163,7 +171,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       zoom: zoom.value,
       isGhost,
       isHovered,
-      isDeleteMode: isDeleteMode.value
+      isDeleteMode: isDeleteMode.value,
+      isInvalidPlacement: isInvalid
     });
 
     ctx.restore();
@@ -172,10 +181,38 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function drawGhostPiece(): void {
     if (!ghostPiece.value) return;
-    
+
     // Draw the snapped version if available, otherwise the regular ghost
     const pieceToRender = snappedGhostPiece.value || ghostPiece.value;
-    drawTrackPiece(pieceToRender, true);
+    const overlaps = pieces.value.some((p) => wouldOverlap(pieceToRender, p));
+    drawTrackPiece(pieceToRender, true, false, overlaps);
+  }
+
+  function drawInvalidZones(): void {
+    if (!ctx || !ghostPiece.value) return;
+    const gridSize = getGridSize();
+    // Draw zone around the ghost piece itself using a consistent radius
+    const ghostRadius = 3.5;
+    const [gx, gy] = toCanvasCoords(ghostPiece.value.x, ghostPiece.value.y);
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = 'rgba(0,0,255,0.2)';
+    ctx.beginPath();
+    ctx.arc(gx, gy, ghostRadius * gridSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    for (const p of pieces.value) {
+      let radius = 3.5;
+      const [cx, cy] = toCanvasCoords(p.x, p.y);
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = 'rgba(0,0,255,0.3)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * gridSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   function drawConnectionPoints(): void {
@@ -225,6 +262,9 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
     drawGrid();
     drawGhostPiece();
+    if (showInvalidZones.value) {
+      drawInvalidZones();
+    }
     pieces.value.forEach((p) => {
       const isHovered = hoveredPiece.value === p;
       drawTrackPiece(p, false, isHovered);
@@ -395,6 +435,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     const pieceAtPosition = findPieceAtPosition(mouseX, mouseY);
     if (pieceAtPosition) {
       draggingPiece.value = pieceAtPosition;
+      dragStartPiece = { ...pieceAtPosition };
       const [px, py] = toCanvasCoords(pieceAtPosition.x, pieceAtPosition.y);
       offsetX = (mouseX - px) / gridSize;
       offsetY = (mouseY - py) / gridSize;
@@ -480,7 +521,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
 
   function handleMouseUp(e: MouseEvent): void {
     if (draggingPiece.value) {
+      const overlap = pieces.value.some(
+        (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+      );
+      if (overlap && dragStartPiece) {
+        draggingPiece.value.x = dragStartPiece.x;
+        draggingPiece.value.y = dragStartPiece.y;
+        draggingPiece.value.rotation = dragStartPiece.rotation;
+        draggingPiece.value.flipped = dragStartPiece.flipped;
+      }
       draggingPiece.value = null;
+      dragStartPiece = null;
       saveHistoryIfChanged();
     }
     isPanning.value = false;
@@ -535,6 +586,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       };
     }
     
+    // Prevent placing pieces on top of existing ones
+    const overlaps = pieces.value.some(p => wouldOverlap(pieceToPlace, p));
+    if (overlaps) {
+      console.warn('Piece overlaps with an existing piece, placement aborted');
+      return;
+    }
+
     pieces.value.push(pieceToPlace);
     
     // Update ghost piece for next placement
@@ -592,6 +650,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       redraw();
       return;
     }
+
+    // Handle invalid zone debug toggle
+    if (e.key === 'b' || e.key === 'B') {
+      showInvalidZones.value = !showInvalidZones.value;
+      redraw();
+      return;
+    }
     
     // Handle shift key for disabling snapping
     if (e.key === 'Shift') {
@@ -606,6 +671,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     
     draggingPiece.value.rotation =
       (draggingPiece.value.rotation + ROTATION_STEP) % (2 * Math.PI);
+    const originalRotation = draggingPiece.value.rotation;
+    const overlap = pieces.value.some(
+      (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+    );
+    if (overlap) {
+      draggingPiece.value.rotation = originalRotation;
+    }
     redraw();
     return true;
   }
@@ -636,8 +708,15 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     if (!draggingPiece.value || (e.key !== 'f' && e.key !== 'F')) {
       return false;
     }
-    
+
+    const originalFlipped = draggingPiece.value.flipped;
     draggingPiece.value.flipped = !draggingPiece.value.flipped;
+    const overlap = pieces.value.some(
+      (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
+    );
+    if (overlap) {
+      draggingPiece.value.flipped = originalFlipped;
+    }
     redraw();
     return true;
   }
@@ -865,6 +944,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     selectedPieceType,
     isDeleteMode,
     showConnectionPoints,
+    showInvalidZones,
     historyStack,
     isPanning,
     panStartX,

@@ -42,3 +42,4 @@ export {
   validateLayout
 } from './connections';
 export type { ConnectionPoint, SnapResult } from './connections';
+export { wouldOverlap } from './connections';

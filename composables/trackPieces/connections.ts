@@ -587,7 +587,7 @@ function isValidConnection(
 /**
  * Check if two pieces would physically overlap in an invalid way
  */
-function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
+export function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
   // Calculate the distance between piece centers
   const centerDistance = Math.sqrt(
     Math.pow(piece1.x - piece2.x, 2) + Math.pow(piece1.y - piece2.y, 2)
@@ -601,8 +601,8 @@ function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     // But allow for end-to-end connections
     minDistance = 3.5; // Allow some tolerance for valid connections
   } else if (piece1.type === 'curve' || piece2.type === 'curve') {
-    // Curves need more space due to their radius
-    minDistance = 1.5; // More permissive for curve connections
+    // Use the same minimum distance as straight pieces to avoid overlaps
+    minDistance = 3.5;
   }
   
   // If pieces are too close (but not connecting), they're likely overlapping
