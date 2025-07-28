@@ -890,3 +890,33 @@ export function getConnectionIndicators(pieces: TrackPiece[]): ConnectionPoint[]
 
   return allConnections;
 }
+/**
+ * Get all pieces connected to a given piece via actual connections
+ */
+export function getConnectedPieces(startPiece: TrackPiece, pieces: TrackPiece[]): TrackPiece[] {
+  const visited = new Set<TrackPiece>();
+  const stack: TrackPiece[] = [startPiece];
+
+  while (stack.length) {
+    const piece = stack.pop()!;
+    if (visited.has(piece)) continue;
+    visited.add(piece);
+
+    const conns = getConnectionPoints(piece);
+    for (const other of pieces) {
+      if (visited.has(other) || other === piece) continue;
+      const otherConns = getConnectionPoints(other);
+      outer: for (const c1 of conns) {
+        for (const c2 of otherConns) {
+          const dist = Math.sqrt((c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2);
+          if (dist <= 0.1) {
+            stack.push(other);
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(visited);
+}

@@ -6,10 +6,11 @@ import {
   findSnapPosition, 
   getConnectionIndicators,
   validateLayout,
+  wouldOverlap,
+  getConnectedPieces,
   checkCollision,
   type TrackPiece,
   type GhostPiece, 
-  wouldOverlap,
   type TrackPieceType,
   type ConnectionPoint
 } from './trackPieces';
@@ -41,6 +42,13 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   const ghostPiece = ref<GhostPiece | null>(null);
   const snappedGhostPiece = ref<GhostPiece | null>(null); // Snapped version of ghost piece
   const draggingPiece = ref<TrackPiece | null>(null);
+  const draggingGroup = ref<TrackPiece[] | null>(null);
+  let dragGroupAnchor: TrackPiece | null = null;
+  const groupRelativeOffsets = new Map<TrackPiece, { dx: number; dy: number }>();
+  const groupStartPositions = new Map<TrackPiece, TrackPiece>();
+  let groupOffsetX = 0;
+  let groupOffsetY = 0;
+  let groupHoldTimeout: ReturnType<typeof setTimeout> | null = null;
   let dragStartPiece: TrackPiece | null = null;
   const hoveredPiece = ref<TrackPiece | null>(null);
   const isDeleteMode = ref(false);
@@ -257,6 +265,26 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
   }
 
+  function startGroupDrag(anchor: TrackPiece, mouseX: number, mouseY: number): void {
+    const connected = getConnectedPieces(anchor, pieces.value);
+    if (connected.length <= 1) return;
+    draggingGroup.value = connected;
+    dragGroupAnchor = anchor;
+    groupRelativeOffsets.clear();
+    groupStartPositions.clear();
+    const gridSize = getGridSize();
+    const [px, py] = toCanvasCoords(anchor.x, anchor.y);
+    groupOffsetX = (mouseX - px) / gridSize;
+    groupOffsetY = (mouseY - py) / gridSize;
+    for (const p of connected) {
+      groupRelativeOffsets.set(p, { dx: p.x - anchor.x, dy: p.y - anchor.y });
+      groupStartPositions.set(p, { ...p });
+    }
+    draggingPiece.value = null;
+    groupHoldTimeout = null;
+    redraw();
+  }
+
   function redraw(): void {
     if (!ctx || !canvas.value) return;
     ctx.clearRect(0, 0, canvas.value.width, canvas.value.height);
@@ -267,7 +295,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     }
     pieces.value.forEach((p) => {
       const isHovered = hoveredPiece.value === p;
-      drawTrackPiece(p, false, isHovered);
+      const inGroup = draggingGroup.value?.includes(p) ?? false;
+      drawTrackPiece(p, inGroup, isHovered && !inGroup);
     });
     
     // Draw connection points for debugging
@@ -382,6 +411,19 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     snappedGhostPiece.value = null;
     isDeleteMode.value = false;
     hoveredPiece.value = null;
+    if (draggingPiece.value) {
+      draggingPiece.value = null;
+    }
+    if (draggingGroup.value) {
+      draggingGroup.value = null;
+      dragGroupAnchor = null;
+      groupRelativeOffsets.clear();
+      groupStartPositions.clear();
+    }
+    if (groupHoldTimeout) {
+      clearTimeout(groupHoldTimeout);
+      groupHoldTimeout = null;
+    }
   }
 
   function enableDeleteMode(): void {
@@ -440,6 +482,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       offsetX = (mouseX - px) / gridSize;
       offsetY = (mouseY - py) / gridSize;
       isPanning.value = false;
+
+      groupHoldTimeout = setTimeout(() => {
+        startGroupDrag(pieceAtPosition, mouseX, mouseY);
+      }, 300);
     }
     
     saveHistoryIfChanged();
@@ -456,7 +502,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     const gridSize = getGridSize();
 
     // Track if we've moved the mouse (indicating a drag)
-    if (isPanning.value || draggingPiece.value) {
+    if (isPanning.value || draggingPiece.value || draggingGroup.value) {
       hasDragged.value = true;
     }
 
@@ -470,7 +516,12 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
         redraw();
       }
     } else {
-      canvas.value.style.cursor = draggingPiece.value ? 'grabbing' : 'default';
+      canvas.value.style.cursor = (draggingPiece.value || draggingGroup.value) ? 'grabbing' : 'default';
+    }
+
+    if (!draggingGroup.value && groupHoldTimeout) {
+      clearTimeout(groupHoldTimeout);
+      groupHoldTimeout = null;
     }
 
     if (ghostPiece.value && !isDeleteMode.value) {
@@ -478,7 +529,17 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       redraw();
     }
 
-    if (draggingPiece.value && !isDeleteMode.value) {
+    if (draggingGroup.value && !isDeleteMode.value) {
+      const [px, py] = toCanvasCoords(0, 0);
+      const anchorX = (mouseX - px) / gridSize - groupOffsetX;
+      const anchorY = (mouseY - py) / gridSize - groupOffsetY;
+      for (const p of draggingGroup.value) {
+        const rel = groupRelativeOffsets.get(p)!;
+        p.x = anchorX + rel.dx;
+        p.y = anchorY + rel.dy;
+      }
+      redraw();
+    } else if (draggingPiece.value && !isDeleteMode.value) {
       const [px, py] = toCanvasCoords(0, 0);
       // Remove grid snapping for dragged pieces - use exact mouse coordinates
       const exactX = (mouseX - px) / gridSize - offsetX;
@@ -520,6 +581,33 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleMouseUp(e: MouseEvent): void {
+    if (groupHoldTimeout) {
+      clearTimeout(groupHoldTimeout);
+      groupHoldTimeout = null;
+    }
+    if (draggingGroup.value) {
+      const overlap = pieces.value.some((p) => {
+        if (draggingGroup.value!.includes(p)) return false;
+        return draggingGroup.value!.some(g => wouldOverlap(g, p));
+      });
+      if (overlap) {
+        for (const piece of draggingGroup.value) {
+          const orig = groupStartPositions.get(piece);
+          if (orig) {
+            piece.x = orig.x;
+            piece.y = orig.y;
+            piece.rotation = orig.rotation;
+            piece.flipped = orig.flipped;
+          }
+        }
+      }
+      draggingGroup.value = null;
+      dragGroupAnchor = null;
+      groupRelativeOffsets.clear();
+      groupStartPositions.clear();
+      saveHistoryIfChanged();
+    }
+
     if (draggingPiece.value) {
       const overlap = pieces.value.some(
         (p) => p !== draggingPiece.value && wouldOverlap(draggingPiece.value!, p)
@@ -683,10 +771,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
   }
 
   function handleDraggedPieceEscape(e: KeyboardEvent): boolean {
-    if (!draggingPiece.value || e.key !== 'Escape') {
+    if (!(draggingPiece.value || draggingGroup.value) || e.key !== 'Escape') {
       return false;
     }
-    
+
     clearSelection();
     return true;
   }
