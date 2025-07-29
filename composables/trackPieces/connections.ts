@@ -1,4 +1,5 @@
 import type { TrackPiece } from './types';
+import { ROTATION_STEP } from '../constants';
 
 export interface ConnectionPoint {
   x: number;
@@ -157,7 +158,7 @@ export function canConnectWithRotation(
   while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
   
   // Snap to valid rotation increments
-  const rotationStep = piece1.type === 'curve' ? Math.PI / 8 : Math.PI / 2;
+  const rotationStep = piece1.type === 'curve' ? ROTATION_STEP : Math.PI / 2;
   const snappedRotation = Math.round(rotationDelta / rotationStep) * rotationStep;
   
   // Check if the snapped rotation creates a valid alignment
@@ -313,7 +314,7 @@ function validateStraightToCurve(
     7 * Math.PI / 4  // 315° difference
   ];
   
-  const tolerance = Math.PI / 8; // 22.5° tolerance
+  const tolerance = ROTATION_STEP; // 22.5° tolerance
   const isValidOrientation = validOrientations.some(validAngle => 
     Math.abs(normalizedRotDiff - validAngle) < tolerance
   );
@@ -435,7 +436,7 @@ export function findSnapPosition(
   
   for (const pieceVariant of piecesToTry) {
     // Try different rotations to see if any create valid connections
-    const rotationSteps = pieceVariant.type === 'curve' ? 16 : 4; // 22.5° for curves, 90° for straights
+    const rotationSteps = 16; // Allow 22.5° increments for all pieces
     const rotationIncrement = (2 * Math.PI) / rotationSteps;
     
     for (let rotStep = 0; rotStep < rotationSteps; rotStep++) {
@@ -586,7 +587,7 @@ function isValidConnection(
 /**
  * Check if two pieces would physically overlap in an invalid way
  */
-function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
+export function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
   // Calculate the distance between piece centers
   const centerDistance = Math.sqrt(
     Math.pow(piece1.x - piece2.x, 2) + Math.pow(piece1.y - piece2.y, 2)
@@ -600,8 +601,8 @@ function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     // But allow for end-to-end connections
     minDistance = 3.5; // Allow some tolerance for valid connections
   } else if (piece1.type === 'curve' || piece2.type === 'curve') {
-    // Curves need more space due to their radius
-    minDistance = 1.5; // More permissive for curve connections
+    // Use the same minimum distance as straight pieces to avoid overlaps
+    minDistance = 3.5;
   }
   
   // If pieces are too close (but not connecting), they're likely overlapping
@@ -626,6 +627,21 @@ function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     return true;
   }
   
+  return false;
+}
+
+/**
+ * Check if a piece overlaps with any in a list
+ */
+export function checkCollision(
+  piece: TrackPiece,
+  others: TrackPiece[]
+): boolean {
+  for (const other of others) {
+    if (wouldOverlap(piece, other)) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -866,10 +882,41 @@ export function validateLayout(pieces: TrackPiece[]): { isValid: boolean; errors
  */
 export function getConnectionIndicators(pieces: TrackPiece[]): ConnectionPoint[] {
   const allConnections: ConnectionPoint[] = [];
-  
+
   for (const piece of pieces) {
     const connections = getConnectionPoints(piece);
+    allConnections.push(...connections);
   }
-  
+
   return allConnections;
+}
+/**
+ * Get all pieces connected to a given piece via actual connections
+ */
+export function getConnectedPieces(startPiece: TrackPiece, pieces: TrackPiece[]): TrackPiece[] {
+  const visited = new Set<TrackPiece>();
+  const stack: TrackPiece[] = [startPiece];
+
+  while (stack.length) {
+    const piece = stack.pop()!;
+    if (visited.has(piece)) continue;
+    visited.add(piece);
+
+    const conns = getConnectionPoints(piece);
+    for (const other of pieces) {
+      if (visited.has(other) || other === piece) continue;
+      const otherConns = getConnectionPoints(other);
+      outer: for (const c1 of conns) {
+        for (const c2 of otherConns) {
+          const dist = Math.sqrt((c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2);
+          if (dist <= 0.1) {
+            stack.push(other);
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(visited);
 }

@@ -17,7 +17,7 @@ defineEmits<Emits>();
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div v-if="show" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
       <h2 class="text-xl font-bold mb-4">🤖 Auto Layout Generator</h2>
       <p class="text-gray-600 mb-4">Generate a connected track layout automatically. Specify how many pieces you want to use:</p>
