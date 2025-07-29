@@ -78,7 +78,7 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <canvas ref="canvas" id="trackCanvas" class="border border-gray-300 block"></canvas>
+    <canvas ref="canvas" class="w-screen h-screen"></canvas>
 
     <transition
       enter-from-class="-translate-x-[calc(100%)] opacity-0"

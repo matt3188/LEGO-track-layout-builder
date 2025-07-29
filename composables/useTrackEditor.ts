@@ -516,7 +516,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
         redraw();
       }
     } else {
-      canvas.value.style.cursor = (draggingPiece.value || draggingGroup.value) ? 'grabbing' : 'default';
+      canvas.value.style.cursor = (isPanning.value || draggingPiece.value || draggingGroup.value) ? 'grabbing' : 'grab';
     }
 
     if (!draggingGroup.value && groupHoldTimeout) {
