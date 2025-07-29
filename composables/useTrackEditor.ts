@@ -606,6 +606,7 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       groupRelativeOffsets.clear();
       groupStartPositions.clear();
       saveHistoryIfChanged();
+      redraw();
     }
 
     if (draggingPiece.value) {
