@@ -1,4 +1,9 @@
-export type TrackPieceType = 'straight' | 'curve' | null;
+export type TrackPieceType =
+  | 'straight'
+  | 'curve'
+  | 'switchLeft'
+  | 'switchRight'
+  | null;
 
 export interface TrackPiece {
   x: number;
