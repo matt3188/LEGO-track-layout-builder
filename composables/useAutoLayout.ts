@@ -55,7 +55,19 @@ export function useAutoLayout() {
     // Find the best strategy that can handle the given pieces
     for (const strategy of strategies) {
       if (strategy.canBuild(straightCount, curveCount)) {
-        return strategy.build(straightCount, curveCount);
+        let pieces = strategy.build(straightCount, curveCount);
+
+        // If the chosen strategy didn't place every piece, try to complete
+        // the layout using a simple backtracking search before falling back
+        if (pieces.length < straightCount + curveCount) {
+          pieces = attemptCompleteLayout(
+            pieces,
+            straightCount,
+            curveCount
+          );
+        }
+
+        return pieces;
       }
     }
 
@@ -467,6 +479,68 @@ export function useAutoLayout() {
     }
     
     return pieces;
+  }
+
+  /**
+   * Try to place any remaining pieces using a simple backtracking search.
+   * If backtracking fails, fall back to placing pieces to the side.
+   */
+  function attemptCompleteLayout(
+    initial: TrackPiece[],
+    totalStraights: number,
+    totalCurves: number
+  ): TrackPiece[] {
+    const placed = [...initial];
+    const placedStraights = placed.filter(p => p.type === 'straight').length;
+    const placedCurves = placed.filter(p => p.type === 'curve').length;
+
+    let remainingStraights = totalStraights - placedStraights;
+    let remainingCurves = totalCurves - placedCurves;
+
+    const result = backtrack(placed, remainingStraights, remainingCurves, 0);
+    if (result) return result;
+
+    // Backtracking failed - scatter any remaining pieces to the side
+    placeRemainingPieces(placed, remainingStraights, remainingCurves);
+    return placed;
+  }
+
+  const MAX_DEPTH = 12;
+
+  function backtrack(
+    pieces: TrackPiece[],
+    straights: number,
+    curves: number,
+    depth: number
+  ): TrackPiece[] | null {
+    if (straights === 0 && curves === 0) return pieces;
+    if (depth >= MAX_DEPTH) return null;
+
+    const openConnections = findOpenConnections(pieces);
+    for (const conn of openConnections) {
+      const types: ('straight' | 'curve')[] = [];
+      if (straights > 0) types.push('straight');
+      if (curves > 0) types.push('curve');
+
+      for (const t of types) {
+        const candidate = createConnectingPiece(conn, t);
+        if (!candidate) continue;
+        const snap = findSnapPosition(candidate, pieces);
+        const placed = snap
+          ? { ...candidate, x: snap.position.x, y: snap.position.y, rotation: snap.rotation, flipped: snap.flipped }
+          : candidate;
+
+        if (wouldCollide(placed, pieces)) continue;
+
+        const nextPieces = [...pieces, placed];
+        const nextStraights = straights - (t === 'straight' ? 1 : 0);
+        const nextCurves = curves - (t === 'curve' ? 1 : 0);
+        const result = backtrack(nextPieces, nextStraights, nextCurves, depth + 1);
+        if (result) return result;
+      }
+    }
+
+    return null;
   }
   return {
     generateAutoLayout
