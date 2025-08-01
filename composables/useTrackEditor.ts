@@ -951,7 +951,12 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
           throw new Error('Invalid piece data: missing required properties');
         }
         
-        if (piece.type !== 'straight' && piece.type !== 'curve') {
+        if (
+          piece.type !== 'straight' &&
+          piece.type !== 'curve' &&
+          piece.type !== 'switch-left' &&
+          piece.type !== 'switch-right'
+        ) {
           throw new Error(`Invalid piece type: ${piece.type}`);
         }
       }

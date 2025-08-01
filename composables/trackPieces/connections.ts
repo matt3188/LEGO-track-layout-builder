@@ -111,6 +111,56 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
       angle: endAngleDirection, // Facing outward at final angle
       type: 'female'
     });
+  } else if (piece.type === 'switch-left' || piece.type === 'switch-right') {
+    const isLeft = piece.type === 'switch-left';
+    const dir = isLeft ? 1 : -1;
+    const length = 8; // Grid units (32 studs)
+    const radius = 10; // Grid units (40 studs)
+    const angleSpan = Math.PI / 8; // 22.5 deg
+
+    const cos = Math.cos(piece.rotation);
+    const sin = Math.sin(piece.rotation);
+
+    const startX = piece.x - (length / 2) * cos;
+    const startY = piece.y - (length / 2) * sin;
+
+    points.push({
+      x: startX,
+      y: startY,
+      angle: piece.rotation + Math.PI / 2,
+      type: 'male'
+    });
+
+    const straightX = piece.x + (length / 2) * cos;
+    const straightY = piece.y + (length / 2) * sin;
+
+    points.push({
+      x: straightX,
+      y: straightY,
+      angle: piece.rotation - Math.PI / 2,
+      type: 'female'
+    });
+
+    const localCenterX = -radius;
+    const localCenterY = 0;
+    const centerX = piece.x + (localCenterX * cos - localCenterY * sin);
+    const centerY = piece.y + (localCenterX * sin + localCenterY * cos);
+
+    const localEndAngle = angleSpan * dir;
+    const localEndX = radius * Math.cos(localEndAngle);
+    const localEndY = radius * Math.sin(localEndAngle) * dir;
+
+    const endX = centerX + (localEndX * cos - localEndY * sin);
+    const endY = centerY + (localEndX * sin + localEndY * cos);
+
+    const endAngle = piece.rotation + localEndAngle;
+
+    points.push({
+      x: endX,
+      y: endY,
+      angle: endAngle,
+      type: 'female'
+    });
   }
   
   return points;
@@ -140,7 +190,10 @@ export function canConnectWithRotation(
     if (point1.type === point2.type) {
       return { canConnect: false, rotationNeeded: 0 };
     }
-  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+  } else if (
+    (piece1.type === 'curve' || piece1.type?.startsWith('switch')) &&
+    (piece2.type === 'curve' || piece2.type?.startsWith('switch'))
+  ) {
     // Curve to curve: must be opposite types (male→female)
     if (point1.type === point2.type) {
       return { canConnect: false, rotationNeeded: 0 };
@@ -158,7 +211,10 @@ export function canConnectWithRotation(
   while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
   
   // Snap to valid rotation increments
-  const rotationStep = piece1.type === 'curve' ? ROTATION_STEP : Math.PI / 2;
+  const rotationStep =
+    piece1.type === 'curve' || piece1.type?.startsWith('switch')
+      ? ROTATION_STEP
+      : Math.PI / 2;
   const snappedRotation = Math.round(rotationDelta / rotationStep) * rotationStep;
   
   // Check if the snapped rotation creates a valid alignment
@@ -203,11 +259,15 @@ export function validateTrackFlow(
   connectionPoint2: ConnectionPoint
 ): boolean {
   // Check if the connection creates a smooth track transition
-  if (piece1.type === 'straight' && piece2.type === 'curve') {
+  if (piece1.type === 'straight' &&
+      (piece2.type === 'curve' || piece2.type?.startsWith('switch'))) {
     return validateStraightToCurve(piece1, piece2, connectionPoint1, connectionPoint2);
-  } else if (piece1.type === 'curve' && piece2.type === 'straight') {
+  } else if ((piece1.type === 'curve' || piece1.type?.startsWith('switch')) && piece2.type === 'straight') {
     return validateCurveToStraight(piece1, piece2, connectionPoint1, connectionPoint2);
-  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+  } else if (
+    (piece1.type === 'curve' || piece1.type?.startsWith('switch')) &&
+    (piece2.type === 'curve' || piece2.type?.startsWith('switch'))
+  ) {
     return validateCurveToCurve(piece1, piece2, connectionPoint1, connectionPoint2);
   } else if (piece1.type === 'straight' && piece2.type === 'straight') {
     // Straight to straight connections: must be aligned
@@ -524,7 +584,10 @@ function isValidConnectionTypes(
   if (piece1.type === 'straight' && piece2.type === 'straight') {
     // Straight to straight: must be opposite types (male→female)
     return point1.type !== point2.type;
-  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+  } else if (
+    (piece1.type === 'curve' || piece1.type?.startsWith('switch')) &&
+    (piece2.type === 'curve' || piece2.type?.startsWith('switch'))
+  ) {
     // Curve to curve: must be opposite types (male→female)
     return point1.type !== point2.type;
   }
@@ -570,14 +633,21 @@ function isValidConnection(
     return true;
   }
   
-  if (newPiece.type === 'curve' && existingPiece.type === 'curve') {
+  if (
+    (newPiece.type === 'curve' || newPiece.type?.startsWith('switch')) &&
+    (existingPiece.type === 'curve' || existingPiece.type?.startsWith('switch'))
+  ) {
     // Curve to curve: connection points must align properly
     // This is handled by canConnect, but we can add extra validation here
     return true;
   }
   
-  if ((newPiece.type === 'straight' && existingPiece.type === 'curve') ||
-      (newPiece.type === 'curve' && existingPiece.type === 'straight')) {
+  if (
+    (newPiece.type === 'straight' &&
+      (existingPiece.type === 'curve' || existingPiece.type?.startsWith('switch')))
+    ||
+    ((newPiece.type === 'curve' || newPiece.type?.startsWith('switch')) && existingPiece.type === 'straight')
+  ) {
     return true;
   }
   
@@ -602,6 +672,11 @@ export function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     minDistance = 3.5; // Allow some tolerance for valid connections
   } else if (piece1.type === 'curve' || piece2.type === 'curve') {
     // Use the same minimum distance as straight pieces to avoid overlaps
+    minDistance = 3.5;
+  } else if (
+    (piece1.type && piece1.type.startsWith('switch')) ||
+    (piece2.type && piece2.type.startsWith('switch'))
+  ) {
     minDistance = 3.5;
   }
   
@@ -814,7 +889,9 @@ export function validateLayout(pieces: TrackPiece[]): { isValid: boolean; errors
   // ONLY apply this to very specific simple layouts that are clearly problematic
   if (pieces.length === 3) {
     const straight = pieces.find(p => p.type === 'straight');
-    const curves = pieces.filter(p => p.type === 'curve');
+    const curves = pieces.filter(p =>
+      p.type === 'curve' || (p.type && p.type.startsWith('switch'))
+    );
     
     if (straight && curves.length === 2) {
       // Only check for the very specific problematic pattern:
