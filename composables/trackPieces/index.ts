@@ -1,6 +1,7 @@
 import type { TrackPiece, TrackRenderingContext } from './types';
 import { drawStraightTrack } from './straightTrack';
 import { drawCurveTrack } from './curveTrack';
+import { drawSwitchTrack } from './switchTrack';
 
 export function renderTrackPiece(
   piece: TrackPiece,
@@ -18,6 +19,10 @@ export function renderTrackPiece(
       case 'curve':
         drawCurveTrack(piece, context);
         break;
+      case 'switchLeft':
+      case 'switchRight':
+        drawSwitchTrack(piece, context);
+        break;
       default:
         console.warn(`Unknown track piece type: ${piece.type}`);
     }
@@ -29,6 +34,7 @@ export function renderTrackPiece(
 // Export individual track renderers
 export { drawStraightTrack } from './straightTrack';
 export { drawCurveTrack } from './curveTrack';
+export { drawSwitchTrack } from './switchTrack';
 export type { TrackPiece, GhostPiece, TrackPieceType, TrackRenderingContext } from './types';
 export { ROTATION_STEP } from '../constants';
 

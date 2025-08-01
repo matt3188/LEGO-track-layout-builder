@@ -5,6 +5,8 @@ interface Props {
   pieceCounts?: Record<string, number>;
   onAddStraight?: () => void;
   onAddCurve?: () => void;
+  onAddSwitchLeft?: () => void;
+  onAddSwitchRight?: () => void;
   onEnableDeleteMode?: () => void;
   onUndo?: () => void;
   onCopy?: () => void;
@@ -36,6 +38,20 @@ const controlButtons = computed((): ControlButton[] => [
     label: 'Add Curve',
     icon: 'mdi:plus-thick',
     action: props.onAddCurve,
+    color: 'neutral',
+    variant: 'outline'
+  },
+  {
+    label: 'Add Left Switch',
+    icon: 'mdi:plus-thick',
+    action: props.onAddSwitchLeft,
+    color: 'neutral',
+    variant: 'outline'
+  },
+  {
+    label: 'Add Right Switch',
+    icon: 'mdi:plus-thick',
+    action: props.onAddSwitchRight,
     color: 'neutral',
     variant: 'outline'
   },

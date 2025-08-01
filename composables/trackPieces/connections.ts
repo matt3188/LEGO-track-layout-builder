@@ -112,6 +112,46 @@ export function getConnectionPoints(piece: TrackPiece): ConnectionPoint[] {
       type: 'female'
     });
   }
+  else if (piece.type === 'switchLeft' || piece.type === 'switchRight') {
+    const dir = piece.type === 'switchLeft' ? 1 : -1;
+    const mainLength = 8; // grid units
+    const curveStart = 4; // start of curve from origin
+    const radius = 10;
+    const angleSpan = Math.PI / 8;
+
+    const cos = Math.cos(piece.rotation);
+    const sin = Math.sin(piece.rotation);
+
+    // start connection at origin
+    points.push({
+      x: piece.x,
+      y: piece.y,
+      angle: piece.rotation + Math.PI / 2,
+      type: 'male'
+    });
+
+    // straight exit
+    const endX = piece.x + mainLength * cos;
+    const endY = piece.y + mainLength * sin;
+    points.push({
+      x: endX,
+      y: endY,
+      angle: piece.rotation - Math.PI / 2,
+      type: 'female'
+    });
+
+    // curve exit
+    const localX = curveStart + radius * Math.sin(angleSpan);
+    const localY = dir * radius * (1 - Math.cos(angleSpan));
+    const cx = piece.x + localX * cos - localY * sin;
+    const cy = piece.y + localX * sin + localY * cos;
+    points.push({
+      x: cx,
+      y: cy,
+      angle: piece.rotation + dir * angleSpan,
+      type: 'female'
+    });
+  }
   
   return points;
 }
@@ -158,7 +198,10 @@ export function canConnectWithRotation(
   while (rotationDelta < -Math.PI) rotationDelta += 2 * Math.PI;
   
   // Snap to valid rotation increments
-  const rotationStep = piece1.type === 'curve' ? ROTATION_STEP : Math.PI / 2;
+  const rotationStep =
+    piece1.type === 'curve' || piece1.type === 'switchLeft' || piece1.type === 'switchRight'
+      ? ROTATION_STEP
+      : Math.PI / 2;
   const snappedRotation = Math.round(rotationDelta / rotationStep) * rotationStep;
   
   // Check if the snapped rotation creates a valid alignment
@@ -197,11 +240,19 @@ export function canConnect(point1: ConnectionPoint, point2: ConnectionPoint): bo
  * Validate that a connection creates logical track flow
  */
 export function validateTrackFlow(
-  piece1: TrackPiece, 
-  piece2: TrackPiece, 
-  connectionPoint1: ConnectionPoint, 
+  piece1: TrackPiece,
+  piece2: TrackPiece,
+  connectionPoint1: ConnectionPoint,
   connectionPoint2: ConnectionPoint
 ): boolean {
+  if (
+    piece1.type === 'switchLeft' ||
+    piece1.type === 'switchRight' ||
+    piece2.type === 'switchLeft' ||
+    piece2.type === 'switchRight'
+  ) {
+    return true;
+  }
   // Check if the connection creates a smooth track transition
   if (piece1.type === 'straight' && piece2.type === 'curve') {
     return validateStraightToCurve(piece1, piece2, connectionPoint1, connectionPoint2);
@@ -524,7 +575,10 @@ function isValidConnectionTypes(
   if (piece1.type === 'straight' && piece2.type === 'straight') {
     // Straight to straight: must be opposite types (male→female)
     return point1.type !== point2.type;
-  } else if (piece1.type === 'curve' && piece2.type === 'curve') {
+  } else if (
+    (piece1.type === 'curve' || piece1.type === 'switchLeft' || piece1.type === 'switchRight') &&
+    (piece2.type === 'curve' || piece2.type === 'switchLeft' || piece2.type === 'switchRight')
+  ) {
     // Curve to curve: must be opposite types (male→female)
     return point1.type !== point2.type;
   }
@@ -600,7 +654,14 @@ export function wouldOverlap(piece1: TrackPiece, piece2: TrackPiece): boolean {
     // Straight pieces: minimum distance should be close to their length (4 grid units)
     // But allow for end-to-end connections
     minDistance = 3.5; // Allow some tolerance for valid connections
-  } else if (piece1.type === 'curve' || piece2.type === 'curve') {
+  } else if (
+    piece1.type === 'curve' ||
+    piece2.type === 'curve' ||
+    piece1.type === 'switchLeft' ||
+    piece1.type === 'switchRight' ||
+    piece2.type === 'switchLeft' ||
+    piece2.type === 'switchRight'
+  ) {
     // Use the same minimum distance as straight pieces to avoid overlaps
     minDistance = 3.5;
   }

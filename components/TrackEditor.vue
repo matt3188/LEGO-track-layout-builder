@@ -12,6 +12,8 @@ const showAutoLayout = ref(false);
 const {
   addStraight,
   addCurve,
+  addSwitchLeft,
+  addSwitchRight,
   enableDeleteMode,
   undoLastAction,
   copyLayout,
@@ -95,6 +97,8 @@ onUnmounted(() => {
         :piece-counts="pieceCounts"
         :on-add-straight="addStraight"
         :on-add-curve="addCurve"
+        :on-add-switch-left="addSwitchLeft"
+        :on-add-switch-right="addSwitchRight"
         :on-enable-delete-mode="enableDeleteMode"
         :on-undo="undoLastAction"
         :on-copy="copyLayout"

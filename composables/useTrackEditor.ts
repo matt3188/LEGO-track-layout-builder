@@ -405,6 +405,46 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     redraw();
   }
 
+  function addSwitchLeft(): void {
+    selectedPieceType.value = 'switchLeft';
+
+    const gridSize = getGridSize();
+    const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
+    const mouseX = (lastMouseX.value - canvasCenterX) / gridSize;
+    const mouseY = (lastMouseY.value - canvasCenterY) / gridSize;
+
+    ghostPiece.value = {
+      x: mouseX,
+      y: mouseY,
+      type: 'switchLeft',
+      rotation: 0,
+      flipped: false
+    };
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+    redraw();
+  }
+
+  function addSwitchRight(): void {
+    selectedPieceType.value = 'switchRight';
+
+    const gridSize = getGridSize();
+    const [canvasCenterX, canvasCenterY] = toCanvasCoords(0, 0);
+    const mouseX = (lastMouseX.value - canvasCenterX) / gridSize;
+    const mouseY = (lastMouseY.value - canvasCenterY) / gridSize;
+
+    ghostPiece.value = {
+      x: mouseX,
+      y: mouseY,
+      type: 'switchRight',
+      rotation: 0,
+      flipped: false
+    };
+    isDeleteMode.value = false;
+    hoveredPiece.value = null;
+    redraw();
+  }
+
   function clearSelection(): void {
     selectedPieceType.value = null;
     ghostPiece.value = null;
@@ -826,6 +866,10 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
       'S': 'straight',
       'c': 'curve',
       'C': 'curve',
+      'l': 'switchLeft',
+      'L': 'switchLeft',
+      'r': 'switchRight',
+      'R': 'switchRight',
       'd': null, // Delete mode
       'D': null, // Delete mode
       'Escape': null
@@ -1042,6 +1086,8 @@ export function useTrackEditor({ canvas, copyStatus }: UseTrackEditorOptions) {
     lastMouseY,
     addStraight,
     addCurve,
+    addSwitchLeft,
+    addSwitchRight,
     enableDeleteMode,
     clearSelection,
     clearPieces,
